@@ -266,10 +266,10 @@ docs: update API endpoint documentation
 
 ## Team
 
-- **Project Lead:** TBD
-- **Backend:** TBD
-- **Frontend:** TBD
-- **DevOps:** TBD
+- **Project Lead:** ACGV
+- **Backend:** Chinmay
+- **Frontend:** Varsha
+- **DevOps:** Ganesh
 
 ---
 
