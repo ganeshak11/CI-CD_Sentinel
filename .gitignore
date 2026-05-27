@@ -61,3 +61,8 @@ pnpm-lock.yaml
 
 # Misc
 .cache/
+
+#Research papers
+research_papers/
+academic_reports/
+diagrams/

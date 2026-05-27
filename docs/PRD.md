@@ -1,1029 +1,895 @@
 # CI/CD Sentinel — Product Requirements Document
 
-![Version](https://img.shields.io/badge/version-v1.0--MVP-blue)
-![Type](https://img.shields.io/badge/type-DevOps%20Control%20Plane-green)
-![Status](https://img.shields.io/badge/status-In%20Planning-yellow)
+![Version](https://img.shields.io/badge/version-v1.0--See%20Everything-blueviolet)
+![Type](https://img.shields.io/badge/type-Self--Hosted%20OSS%20DevOps%20Tool-green)
+![Status](https://img.shields.io/badge/status-In%20Development-yellow)
+![Database](https://img.shields.io/badge/database-Neo4j%20Graph-blue)
+![Workflow](https://img.shields.io/badge/workflow-Spiral%20%7C%204%20Versions-orange)
 
 ---
 
-## 1. Product Overview
+## 1. Product Vision
 
-**CI/CD Sentinel** is a centralized observability and recovery layer for the software deployment lifecycle.
+**CI/CD Sentinel** is a **self-hosted, open-source intelligent deployment observability platform** powered by a Neo4j graph database.
 
-It integrates with CI/CD pipelines (initially GitHub Actions) to track deployments, manage environment configurations, view logs, monitor health status, and perform rollback or redeployment — all from a single interface.
+It runs alongside a team's existing application stack, connects to GitHub Actions via webhooks, and provides:
 
-The system reduces operational complexity and improves deployment reliability by enabling engineers to manage post-deployment workflows without switching between multiple tools.
+- Real-time deployment graph visibility
+- Graph-based root cause analysis (RCA)
+- Automated rollback with health-triggered detection
+- Deployment risk scoring
+- Multi-channel alert notifications
 
-### Positioning
+> **Core Mental Model:**
+> Deployment failures are a graph problem — not a table problem.
+> Sentinel models the entire deployment lifecycle as a connected graph:
+> services, deployments, commits, files, errors, and health checks are nodes.
+> The relationships between them are the intelligence.
 
-> **Deployment-centric root cause analysis for small teams**  
-> When your deployment breaks at 3am, you don't want 50 dashboards.  
-> You want: What changed? Why did it break? How do I fix it?  
-> Sentinel answers those 3 questions in 30 seconds.
+### What It Is NOT
 
-**Not competing with:**
-- Datadog/New Relic → Full observability platforms (metrics, traces, logs)
-- ArgoCD → Kubernetes GitOps heavy artillery
-- Spinnaker → Enterprise deployment orchestration
-
-**Solving:**
-- "What broke?" panic after deployment
-- Manual correlation between code changes and health degradation
-- Hours of log analysis to find root cause
-- Risky rollbacks without impact preview
-
-**Key Differentiation:**
-
-| Feature | Traditional Observability | CI/CD Sentinel |
-|---|---|---|
-| **Focus** | Monitor everything | Deployment-centric |
-| **Root Cause** | Generic dashboards | Deployment comparison + error patterns |
-| **Recovery** | Manual investigation | One-click rollback with impact preview |
-| **Env Drift** | Not tracked | GitHub Secrets ↔ Runtime comparison |
-| **Failure Analysis** | Logs + metrics | Git diff + error correlation |
-
-**Mental Model:**
-> Sentinel = deployment black box recorder with automated root cause analysis  
-> Answers "what changed, why it broke, how to fix" in under 60 seconds.
-
----
-
-## 2. Problem Statement
-
-Modern CI/CD pipelines automate build and deployment but lack unified post-deployment control. After deployment, engineers must manually:
-
-- Track deployed versions
-- Access logs across multiple platforms
-- Manage environment variables
-- Perform rollbacks
-- Verify service health
-- Identify root cause of failures
-
-This leads to:
-
-| Pain Point | Impact |
+| Not competing with | Why |
 |---|---|
-| Scattered operational visibility | Slow incident response |
-| Risky manual rollbacks | Potential data loss or downtime |
-| Configuration inconsistencies | Environment drift |
-| Inefficient debugging workflows | High MTTR |
+| Datadog / New Relic | Full observability platforms (metrics, traces, APM) |
+| ArgoCD / Spinnaker | Kubernetes GitOps / enterprise deployment orchestration |
+| Vault / Doppler | Secret management platforms |
+| Prometheus / Grafana | General metrics collection and dashboarding |
 
-> There is a need for a unified control interface that centralizes deployment observability and control operations.
+### What It Solves
 
----
-
-## 3. Goals & Objectives
-
-### Primary Goals
-- Provide centralized visibility of the deployment lifecycle
-- Enable safe rollback and redeployment
-- Store deployment history and metadata
-- Allow controlled environment configuration management
-- Aggregate logs for easier debugging
-- Provide deployment health status monitoring
-
-### Secondary Goals
-- Reduce debugging time
-- Improve reliability awareness
-- Simplify DevOps workflows for small teams
+| Problem | Sentinel's Answer |
+|---|---|
+| "What broke?" panic after deployment | Graph traversal: error → file → commit → deployment |
+| Manual rollback risk | Automated rollback with last-healthy-deployment graph query |
+| Hours of log analysis | Rule-based error pattern detection with confidence scores |
+| Config drift between environments | Environment snapshot comparison via graph |
+| Risky rollbacks without preview | Impact preview before rollback confirmation |
+| Deployment risk unknown before push | Historical risk scoring from graph failure patterns |
 
 ---
 
-## 4. Target Users
+## 2. Deployment Model
+
+**CI/CD Sentinel is self-hosted.** Each team deploys their own private instance inside their own cloud infrastructure.
+
+```
+[Customer Cloud]
+┌──────────────────────────────────────────────────────┐
+│                                                      │
+│   ┌─────────────────┐     ┌────────────────────┐     │
+│   │  Their Apps /   │     │  CI/CD Sentinel    │     │
+│   │  Microservices  │◄────│  (Docker Compose)  │     │
+│   └─────────────────┘     │                    │     │
+│                           │  Neo4j + Redis     │     │
+│   ┌─────────────────┐     │  Backend API       │     │
+│   │  GitHub Actions │────►│  Next.js Dashboard │     │
+│   │  (Webhooks)     │     └────────────────────┘     │
+│   └─────────────────┘                                │
+└──────────────────────────────────────────────────────┘
+```
+
+### Why Self-Hosted?
+
+- **Data sovereignty** — CI/CD data (commits, secrets snapshots, pipeline history) stays in the customer's cloud
+- **Security** — no third party touches CI/CD infrastructure
+- **Compliance** — customer manages their own data retention and regulatory requirements
+- **Scale** — each instance scales independently; no multi-tenant complexity
+- **Trust** — DevOps engineers audit what they run
+
+### Business Model (Phased)
+
+| Phase | Model | Features |
+|---|---|---|
+| **Phase 1** | Open Source Core (MIT) | Full deployment tracking, health monitoring, RCA, rollback |
+| **Phase 2** | Enterprise Edition (License Key) | RBAC, SSO (SAML/OIDC), audit logs, advanced graph analytics |
+| **Phase 3** | Sentinel Cloud (Managed SaaS) | We host it for teams who prefer not to self-host |
+
+**Enterprise License Enforcement:**
+On startup, if `SENTINEL_LICENSE_KEY` is set, the backend validates it against `license.sentinel.io`. Enterprise features are gated behind this check. If the key is absent or invalid, the system runs in full OSS mode — no core functionality is disabled.
+
+---
+
+## 3. Problem Statement
+
+Modern CI/CD pipelines automate build and deployment but leave engineers blind after the deployment fires:
+
+- **No unified visibility** — logs, metrics, deployment state, and config spread across GitHub, hosting dashboards, and monitoring tools
+- **Relational data cannot express failure chains** — traditional SQL requires complex JOINs to answer "what caused this failure?" Neo4j makes this a single graph traversal
+- **Manual rollbacks are risky** — engineers manually identify safe rollback targets, often under pressure at 3am
+- **MTTR is high** — correlating a code change to a runtime failure requires switching between 4–5 tools
+- **No pre-deployment intelligence** — teams have no signal about deployment risk before pushing
+
+---
+
+## 4. Why Neo4j (The Core Technical Decision)
+
+The fundamental insight driving this platform:
+
+> **Deployment failures are a graph problem.**
+
+Consider this failure chain:
+```
+Deployment #47 (failed)
+  └─ Based on Commit abc123
+       └─ Changed File: src/config/database.ts
+            └─ Caused Error: "Connection refused on port 5432" (15x)
+                 └─ Related to: Previous working Deployment #46
+```
+
+In PostgreSQL, answering this requires 4 JOINs across 4 tables.
+In Neo4j, this is one Cypher traversal:
+
+```cypher
+MATCH (d:Deployment {id: $id})-[:CAUSED_ERROR]->(e:ErrorPattern)
+MATCH (d)-[:BASED_ON]->(c:Commit)-[:CHANGED_FILE]->(f:File)
+WHERE e.severity = 'critical'
+RETURN d, e, f, c
+```
+
+This enables capabilities impossible to build cleanly in a relational model:
+
+| Capability | Why Graph |
+|---|---|
+| Automated rollback target | Graph query: last healthy deployment before failure |
+| File-level risk scoring | Aggregate: files appearing in failed deployment chains |
+| Blast radius analysis | Graph traversal: `DEPENDS_ON` relationships between services |
+| Deployment chain timeline | Linked list: `SUCCEEDED_BY` relationships |
+| Error-to-code correlation | Direct edge: `ErrorPattern`-[`RELATED_TO_FILE`]→`File` |
+
+---
+
+## 5. Target Users
 
 ### Primary Users
-- DevOps learners
-- Backend developers
-- Small engineering teams
-- Student developers deploying projects
+- DevOps engineers at small-to-mid engineering teams
+- Backend developers who own their deployment pipelines
+- Platform engineers building internal tooling
+- Student and indie teams deploying production services
 
 ### User Characteristics
-- Use GitHub for version control
-- Deploy apps using Docker or cloud platforms
-- Require visibility into deployments
-- Need simple rollback capability
+- Use GitHub for version control and CI/CD (GitHub Actions)
+- Deploy via Docker, Render, Railway, Fly.io, or self-managed VMs
+- Need fast post-deployment debugging without enterprise budgets
+- Willing to self-host in exchange for data ownership and privacy
 
 ---
 
-## 5. User Stories
+## 6. User Stories
 
 | # | Role | Goal | Benefit |
 |---|---|---|---|
-| US-01 | Developer | View all deployment versions | Know which version is running per environment |
-| US-02 | Developer | Rollback to a previous version | Quickly recover from failed deployments |
-| US-03 | Developer | Redeploy the latest build | Restart services after fixes |
-| US-04 | Developer | View logs in one place | Faster debugging |
-| US-05 | Developer | View and update environment variables safely | Prevent config changes from breaking production |
-| US-06 | Developer | Check application health | Confirm deployment is functioning correctly |
+| US-01 | Developer | View graph of deployment chain for a failed build | Understand what changed and what it affected |
+| US-02 | Developer | See automated RCA for a failed deployment | Identify root cause without log diving |
+| US-03 | On-call engineer | Trigger automated rollback to last healthy version | Recover in < 60 seconds at 3am |
+| US-04 | Developer | Preview rollback impact before confirming | Avoid rolling back to another broken version |
+| US-05 | DevOps engineer | Get alerts (Slack + Email + GitHub PR) when rollback fires | Full visibility without watching dashboard |
+| US-06 | Developer | View health trends correlated with deployments | See "deploy at 3pm → latency spiked at 3:01pm" |
+| US-07 | Developer | View deployment risk score before a push | Know if a large commit to a critical file is risky |
+| US-08 | Developer | Compare working vs broken deployment side by side | Pinpoint the exact change that broke production |
+| US-09 | Team lead | View historical file-level failure patterns | Know which parts of the codebase are fragile |
+| US-10 | Developer | Check environment drift between GitHub Secrets and running config | Catch config mismatches before they cause failures |
 
 ---
 
-## 6. Functional Requirements
+## 7. Functional Requirements
 
-### 6.1 CI/CD Integration
+### 7.1 Webhook Ingestion (Idempotent)
 
 The system must:
-- Connect with a GitHub repository
-- Receive webhook events from GitHub Actions
-- Store pipeline execution metadata
-- Handle webhook idempotency (prevent duplicate records)
-- Fetch git diff for each deployment via GitHub API
+- Receive GitHub Actions `workflow_run` webhook events
+- Verify webhook signature (`X-Hub-Signature-256`)
+- Check `workflow_run_id` uniqueness **before** writing (idempotency constraint in Neo4j)
+- If duplicate webhook arrives → return `200 OK`, skip processing
+- On valid new event → create `Deployment` and `Commit` nodes, link to `Service`
 
-**Captured data:**
+**Captured per webhook:**
+- `workflow_run_id` (idempotency key)
+- `delivery_id` (GitHub header)
 - Repository name
-- Commit hash (SHA)
-- Build status
-- Artifact version
+- Commit SHA, message, author, branch
+- Build status (`success` / `failure` / `in_progress`)
 - Deployment timestamp
-- Workflow run ID (for idempotency)
-- Delivery ID (GitHub webhook identifier)
-- Git diff (files changed, additions, deletions)
-
-**Idempotency Strategy:**
-
-GitHub retries failed webhooks. Without idempotency:
-- 1 deployment event → 5 duplicate records → dashboard lies
-
-**Solution:**
-```sql
-webhook_events (
-  id,
-  workflow_run_id UNIQUE,  -- prevents duplicates
-  delivery_id,
-  commit_sha,
-  status,
-  received_at
-)
-```
-
-If duplicate webhook arrives → ignore (return 200 OK, don't process).
+- Triggered by (GitHub actor)
 
 ---
 
-### 6.2 Deployment Tracking
+### 7.2 Graph Data Model
 
-The system must store and display:
+#### Nodes
 
-| Field | Description |
-|---|---|
-| `service_name` | Name of the deployed service |
-| `version` | Version number |
-| `commit_ref` | Commit reference (SHA) |
-| `environment` | Target environment (dev/staging/prod) |
-| `status` | Deployment status |
-| `timestamp` | Time of deployment |
+| Node | Key Properties | Description |
+|---|---|---|
+| `Service` | id, name, repo_url, health_endpoint, environment | A tracked microservice or application |
+| `Deployment` | id, workflow_run_id (UNIQUE), version, commit_sha, status, completed_at, webhook_received_at, risk_score | A pipeline execution. Stores both timestamps — rollback window uses `completed_at`. |
+| `Commit` | sha (UNIQUE), message, author, branch, additions, deletions, files_changed | Git commit metadata |
+| `File` | path, language, change_type | A file modified in a commit |
+| `ErrorPattern` | id, type, message, count, severity, first_seen | Detected failure pattern — created by async LogFetchJob, NOT at webhook ingest time |
+| `HealthCheck` | id, status, response_ms, status_code, checked_at | Point-in-time health snapshot |
+| `EnvSnapshot` | id, environment, key, synced_at | GitHub Secrets key name only — values are never available via GitHub API |
+| `RollbackEvent` | id, triggered_by, trigger_type, reason, timestamp, outcome | Rollback action record |
 
-The system must also display a deployment timeline view.
+#### Relationships
+
+| Relationship | Direction | Properties | Meaning |
+|---|---|---|---|
+| `DEPLOYED_TO` | Deployment → Service | timestamp | Deployment targets a service |
+| `BASED_ON` | Deployment → Commit | — | Deployment built from commit |
+| `CHANGED_FILE` | Commit → File | additions, deletions | Commit modified file |
+| `CAUSED_ERROR` | Deployment → ErrorPattern | confidence (float) | Error detected post-log-fetch (async, not at ingest) |
+| `RELATED_TO_FILE` | ErrorPattern → File | — | Error correlated with code change |
+| `HAS_HEALTH` | Deployment → HealthCheck | — | Health snapshot linked to deployment |
+| `SUCCEEDED_BY` | Deployment → Deployment | — | Normal timeline chain (used in rollback target queries) |
+| `ROLLED_BACK_TO` | RollbackEvent → Deployment | reason | Target of rollback |
+| `TRIGGERED` | Deployment → RollbackEvent | — | Auto-rollback link |
+| `REPLACED_BY` | Deployment → Deployment | — | Audit trail only — post-rollback state. Never traversed in rollback target queries. |
+| `BELONGS_TO` | File → Service | — | File is part of service |
+| `SNAPSHOT_FOR` | EnvSnapshot → Service | — | Secret key presence record for service |
+| `DEPENDS_ON` | Service → Service | — | Service dependency (blast radius) |
+
+> **SUCCEEDED_BY vs REPLACED_BY — Query Rule:**
+> Rollback target queries (Q1) traverse only `SUCCEEDED_BY` chains and filter `WHERE prev.status = 'success'`.
+> This automatically excludes `rolled_back` status deployments.
+> `REPLACED_BY` is write-only — created for audit trail, never read in traversal.
 
 ---
 
-### 6.3 Rollback Mechanism
+### 7.3 Health Monitoring
 
 The system must:
-- Maintain full version history
-- Allow user to select a previous version
-- Trigger redeployment of the selected version
-- Store rollback event metadata
+- Run a background worker every **60 seconds**
+- Poll `GET /health` for all registered services
+- Create a `HealthCheck` node linked to the latest `Deployment` via `HAS_HEALTH`
+- Store: status, response_ms, status_code, checked_at
+- Cache last N results in Redis for fast dashboard queries
+- Update service health state in graph
 
----
-
-### 6.4 Redeploy Function
-
-The system must support:
-- Manual redeploy of the latest version via GitHub workflow dispatch
-- Redeploy triggered via UI button
-- Redeploy triggered via API call
-
-**Implementation:**
-
-Sentinel calls GitHub API to re-run the workflow:
-
-```
-POST /repos/{owner}/{repo}/actions/workflows/{workflow_id}/dispatches
-```
-
-**Captured:**
-- Redeploy timestamp
-- Triggered by (user)
-- Target version/commit
-
-> **Scope:** Trigger GitHub workflow only. Not storing artifacts or calling hosting providers directly.
-
----
-
-### 6.5 Logs Viewer
-
-The system must:
-- Display **last 500 logs per deployment** (MVP scope)
-- Filter logs by: `timestamp`, `service`, `environment`, `log level`
-- Show logs from GitHub Actions workflow runs
-
-**Log types:**
-- Build logs (from GitHub Actions)
-- Deployment logs
-- Error logs
-
-**Storage strategy:**
-```sql
--- Store limited logs per deployment
-LIMIT 500 per deployment_id
-Retention: 7 days
-```
-
-**Log ingestion:**
-- Fetch from GitHub Actions API after workflow completion
-- Store in PostgreSQL (not building log aggregation pipeline)
-
-> **Scope:** Simple log viewer, not Elasticsearch. Avoid building full log aggregation platform.
-
----
-
-### 6.6 Environment Variable Management
-
-**MVP Scope: READ-ONLY viewer**
-
-The system must allow:
-- **Viewing** environment variables per environment
-- Masking sensitive values in the UI
-- Showing last updated timestamp
-
-**Out of MVP scope:**
-- ❌ Editing environment variables (scope creep risk)
-- ❌ Secret rotation
-- ❌ Audit trail for changes
-- ❌ Sync with cloud providers
-
-**Why read-only?**
-
-Editing secrets opens political/security questions:
-- Who can edit what?
-- Audit compliance requirements
-- Secret rotation policies
-- Drift sync with AWS Parameter Store / Vault
-
-This quickly becomes competing with Doppler, Infisical, Vault.
-
-**Security Approach:**
-
-Sentinel acts as a **reference viewer**, not a secret store.
-
-```
-env value (from GitHub Secrets)
-   ↓
-fetch via GitHub API (read-only)
-   ↓
-display masked in UI as ***
-```
-
-**Security Rules:**
-- Never store decrypted secrets in database
-- Never log secrets
-- Never send secrets to frontend
-- Secrets are masked in UI as `***`
-
-**Example:**
-```
-ENVIRONMENT: production
-DATABASE_URL=***
-API_KEY=***
-REDIS_HOST=redis.internal
-
-Last synced: 2 hours ago
-```
-
-> **Note:** This is a viewer for small teams, not a Vault replacement. Edit secrets in GitHub directly.
-
----
-
-### 6.7 Health Monitoring
-
-The system must:
-- Check service health endpoints via polling (`GET /health`)
-- Record health status and response time over time
-- Display health indicator and trends on the dashboard
-- Run background worker every 60 seconds
-
-**Health states:**
+**Health States:**
 
 | State | Indicator | Condition |
 |---|---|---|
-| Healthy | 🟢 | Endpoint returns 200, response < 500ms |
-| Degraded | 🟡 | Slow response (500ms - 2s) |
-| Down | 🔴 | Timeout or error |
-
-**Data captured:**
-- Response time (ms)
-- Status code
-- Timestamp
-- Deployment correlation (show impact of deployments on health)
-
-**Example insight:**
-> "Deployment at 3pm caused response time to spike from 50ms to 300ms"
-
-> **Note:** This is endpoint polling for MVP, not Prometheus-level observability.
+| Healthy | 🟢 | `200` response, < 500ms |
+| Degraded | 🟡 | `200` response, 500ms – 2s |
+| Down | 🔴 | Timeout, non-200, or error |
 
 ---
 
-### 6.8 Dashboard
+### 7.4 Automated Rollback Engine
 
-The dashboard must display:
-- Active deployments
-- Recent deployment history
-- Health status per service
-- Recent logs
-- Rollback controls
-- **Deployment comparison view** (working vs broken)
-- **Error pattern analysis**
-- **Environment drift indicators**
+**Trigger conditions — Two-Tier System:**
+
+| Tier | Trigger | Latency | Reliability |
+|---|---|---|---|
+| **Tier 1 — Health-only** | 3 consecutive `down` health checks after deployment | ~2 min (60s × 3) | High — no log dependency |
+| **Tier 1 — Health-only** | `degraded` persisting > 5 min post-deployment | ~5 min | High |
+| **Tier 2 — Error-correlated** | Critical error count > 10 within 5 min of deployment | Depends on log fetch | Lower — requires log pipeline |
+
+Tier 2 is supplemental — it adds error context to the rollback notification but does NOT block Tier 1. If logs haven't been fetched yet, Tier 1 fires independently based on health alone.
+
+> **Timing note:** The rollback window clock starts from `deployment.completed_at` — the timestamp GitHub marks the workflow as `completed`. This is stored separately from `webhook_received_at` (when Sentinel received the event). A 5-minute build means these can differ by up to 5 minutes.
+
+**Rollback Algorithm:**
+```
+1. Detect trigger condition via health worker
+2. Graph query → find last healthy deployment before failure:
+   MATCH (failing:Deployment {id: $id})-[:DEPLOYED_TO]->(svc:Service)
+   MATCH (prev:Deployment)-[:DEPLOYED_TO]->(svc)
+   MATCH (prev)-[:SUCCEEDED_BY*]->(failing)   // traverse timeline chain only
+   WHERE prev.status = 'success'               // excludes rolled_back, failed
+   WITH prev ORDER BY prev.completed_at DESC LIMIT 1
+   RETURN prev
+3. If found:
+   a. Create RollbackEvent node
+   b. Link: failing_deployment -[:TRIGGERED]-> RollbackEvent
+   c. Link: RollbackEvent -[:ROLLED_BACK_TO]-> target_deployment
+   d. Link: failing_deployment -[:REPLACED_BY]-> target_deployment  // audit only
+   e. Call GitHub Actions Re-run API: POST /repos/{owner}/{repo}/actions/runs/{prev.workflow_run_id}/rerun
+      (This re-runs the exact successful workflow without requiring workflow file changes)
+   f. Send notifications (GitHub PR comment + Slack + Email)
+   g. Update failing deployment status to "rolled_back"
+4. If NOT found (no clean prior deployment):
+   a. Alert all channels: "Manual intervention required — no safe rollback target"
+   b. Mark service: "needs_manual_intervention"
+   c. Do NOT auto-rollback
+```
+
+> **Advanced Rollback Mode:** If teams prefer deploying a specific SHA rather than re-running a past job, they can configure a `workflow_dispatch` trigger in their actions file. Sentinel supports this as a configuration option per service.
+
+**Manual Rollback:**
+User can also trigger rollback from the dashboard with a preview step showing what will change.
 
 ---
 
-### 6.9 Deployment Comparison (Root Cause Analysis)
+### 7.5 Root Cause Analysis Engine (Rule-Based)
 
-**When deployment fails or health degrades, show:**
+The system must analyze deployment logs and correlate errors to code changes using a rule-based pattern engine.
 
+#### Log Fetch Pipeline (Async — Critical Implementation Detail)
+
+`ErrorPattern` nodes are **NOT created at webhook ingest time.** They require GitHub Actions logs, which must be fetched separately.
+
+**Log fetch flow:**
 ```
-Deployment #47 - FAILED
-├─ Commit: abc123 "feat: add new API endpoint"
-├─ Deployed: 3:15pm
-├─ Health Status: 🔴 Down (3:16pm)
-├─ Error Pattern Detected:
-│  └─ "Connection refused on port 5432" (15 occurrences)
-├─ Likely Cause: Database connection issue
-├─ Code Changes (vs Deployment #46):
-│  └─ Modified: src/config/database.ts
-│     - Old: DATABASE_URL=postgres://localhost:5432
-│     + New: DATABASE_URL=postgres://prod-db:5432
-└─ Suggested Action: Check DATABASE_URL env variable
-```
-
-**Comparison features:**
-- Side-by-side git diff (working vs broken deployment)
-- Health metric deltas (response time, error rate, status)
-- Environment variable differences
-- Error log pattern analysis
-- Files changed with line-by-line diff
-
-**Implementation:**
-```
-GET /deployments/:id/compare/:previousId
-
-Returns:
-{
-  "current": { deployment details },
-  "previous": { deployment details },
-  "gitDiff": { files, additions, deletions },
-  "healthDelta": { responseTime, errorRate, status },
-  "errorPatterns": [ { pattern, count, severity } ],
-  "envDiff": [ { key, oldValue, newValue } ]
-}
+1. Webhook received → Deployment node created (status: in_progress / success / failed)
+2. Async LogFetchJob triggered (immediately after webhook processing completes)
+3. Job calls: GET /repos/{owner}/{repo}/actions/runs/{run_id}/logs
+   → GitHub returns 302 redirect to a signed zip URL (not raw text)
+4. Job follows redirect → downloads zip file into memory
+5. Job unzips → iterates per-job log text files inside the zip
+6. Applies guardrails to prevent OOM on large monorepo logs:
+   - Skip individual zip entries > 5 MB
+   - Process only first 10,000 lines per log file
+   - Abort entire fetch job if processing exceeds 60 seconds
+7. Job runs regex patterns against each processed log line
+8. Matching patterns → CREATE ErrorPattern nodes + CAUSED_ERROR relationships
+9. Job stores raw log lines in Neo4j (capped at 500, 7-day retention)
+10. RCA status on Deployment node updated: pending → complete
 ```
 
----
+**Rate limiting:** GitHub Actions log API counts against the token's 5,000 req/hr limit. Fetch runs once per deployment, not on every dashboard view.
 
-### 6.10 Error Pattern Detection
+**RCA status field on Deployment:**
+- `rca_status: 'pending'` — log fetch not yet complete
+- `rca_status: 'complete'` — ErrorPatterns populated
+- `rca_status: 'unavailable'` — log fetch failed (API error, rate limit)
 
-The system must:
-- Parse deployment logs for common failure patterns
-- Identify error frequency and severity
-- Correlate errors with code changes
+The dashboard shows a loading state while `rca_status = 'pending'`.
 
-**Detected patterns:**
-- Database connection errors (`ECONNREFUSED`, `Connection refused`)
-- API timeouts (`ETIMEDOUT`, `Request timeout`)
-- Missing environment variables (`undefined is not defined`)
-- Port conflicts (`EADDRINUSE`)
-- Authentication failures (`401`, `403`, `Invalid credentials`)
-- Memory issues (`JavaScript heap out of memory`)
+#### Error Pattern Rules
 
-**Output:**
+| Pattern Type | Detection Signal | Severity |
+|---|---|---|
+| DB Connection | `ECONNREFUSED`, `Connection refused`, `connect ETIMEDOUT` | Critical |
+| API Timeout | `ETIMEDOUT`, `Request timeout`, `socket hang up` | Critical |
+| Missing Env Var | `undefined is not defined`, `getenv.*not set` | Critical |
+| Port Conflict | `EADDRINUSE`, `address already in use` | Critical |
+| OOM | `JavaScript heap out of memory`, `OOMKilled` | Critical |
+| Auth Failure | `401`, `403`, `Invalid credentials`, `Unauthorized` | Warning |
+| DNS Failure | `ENOTFOUND`, `getaddrinfo ENOENT` | Warning |
+| Slow Query | `slow query`, `query timeout` | Info |
+
+**RCA Output:**
 ```
-Error Analysis for Deployment #47:
+Root Cause Analysis — Deployment #47
+
+Status:     complete
+Confidence: 87%
+Recommendation: ROLLBACK
 
 🔴 Critical (15 occurrences):
   "Connection refused on port 5432"
-  First seen: 3:16pm (1 minute after deployment)
-  Related file: src/config/database.ts
+  First seen: 3:16pm (1 min after deployment)
+  Related file: src/config/database.ts  ← changed in this deployment
 
-🟡 Warning (3 occurrences):
-  "Slow query detected (2.5s)"
-  First seen: 3:18pm
+Git Diff Summary:
+  Modified: src/config/database.ts (+3, -1)
+
+Suggested Action:
+  Check DATABASE_URL in your deployment environment.
+  Rollback target: Deployment #46 (last healthy, 3:05pm)
+```
+
+> **Post-MVP:** LLM-assisted RCA (send error context + git diff to Gemini/OpenAI for natural language explanation). Deferred to avoid scope creep in V1.
+
+---
+
+### 7.6 Deployment Comparison
+
+When a deployment fails, the system must show a side-by-side comparison with the last working deployment:
+
+- Git diff: files changed, additions, deletions, line-by-line
+- Health metric delta: response time, error rate, status change
+- Environment snapshot diff: key/value changes between deployments
+- Error patterns that appeared after the failed deployment
+- Files that appear in both the diff AND the error correlation
+
+**API:**
+```
+GET /api/deployments/:id/compare/:prevId
 ```
 
 ---
 
-### 6.11 Environment Drift Detection
+### 7.7 Deployment Risk Scoring
 
-The system must:
-- Compare GitHub Secrets with running container environment
-- Highlight configuration drift
-- Suggest sync actions
+The system calculates a risk score (0.0 – 1.0) at webhook ingest time using a **two-layer approach** to handle the cold-start problem:
 
-**Display:**
-```
-Environment Variables (Production)
+**Layer 1 — Baseline Heuristics (works on Day 0, no history needed):**
+- Number of files changed (each file +0.02, capped at 0.3)
+- Diff size: additions + deletions > 200 lines → +0.15
+- High-risk file path match (regex): `auth/`, `config/`, `database`, `schema`, `migration`, `.env` → +0.2 each
+- Time of deployment: Friday 16:00–23:59 → +0.1, weekend → +0.05
 
-DATABASE_URL: ***
-Last synced: 2 hours ago
-Status: ⚠️ DRIFT DETECTED
+**Layer 2 — Graph-Enhanced (activates after 10+ deployments in history):**
+- Historical failure rate of files changed (graph query Q3)
+- Each file with > 2 prior failure appearances → +0.1 per file
+- Recent failure pattern on same service → +0.1
 
-GitHub Secrets:     postgres://prod-db:5432
-Running Container:  postgres://localhost:5432
+**Cold-start behavior:** On a fresh Sentinel install, only Layer 1 runs. Scores are labeled `heuristic`. After 10 deployments, Layer 2 activates and scores are labeled `graph-enhanced`. This is shown as a badge in the UI.
 
-[Trigger Redeploy to Sync] button
-```
+**Risk Levels:**
 
-**Implementation:**
-- Fetch GitHub Secrets via API (masked)
-- Compare with last deployment snapshot
-- Show drift indicator if mismatch detected
+| Score | Level | Badge |
+|---|---|---|
+| 0.0 – 0.3 | Low | 🟢 |
+| 0.3 – 0.7 | Medium | 🟡 |
+| 0.7 – 1.0 | High | 🔴 |
 
 ---
 
-## 7. Non-Functional Requirements
+### 7.8 Environment Drift Detection
+
+> **GitHub Secrets API Limitation:** The GitHub Secrets API (`GET /repos/{owner}/{repo}/actions/secrets`) returns **secret key names only** — it never returns values, even to authenticated callers. This is by design and cannot be worked around.
+
+**What drift detection CAN detect (key-presence drift):**
+- Keys added to GitHub Secrets since last snapshot
+- Keys removed from GitHub Secrets since last snapshot
+
+**What it CANNOT detect (value drift):**
+- Whether the value of an existing key changed
+- Whether the running container is using a stale value
+
+**For value-drift detection (opt-in):** Services can expose a `GET /env-check` endpoint that returns non-sensitive env key names and a hash of their values. Sentinel compares hashes without ever seeing values. This is an opt-in contract — not required, not enforced.
+
+**The system must:**
+- Fetch GitHub Secrets key list via API after each deployment
+- Create `EnvSnapshot` nodes (key names only, no values) linked to the deployment
+- Compare key set against previous snapshot via graph query
+- Highlight added/removed keys in the drift panel
+- Show drift indicator in dashboard when key sets differ
+
+**Security rules:**
+- Never store secret values — key names only
+- Never log secrets
+- Never send secret values to frontend
+- All secret values displayed as `***` everywhere
+
+---
+
+### 7.9 Notification System (Three Channels)
+
+All automated rollback events and critical alerts are sent to:
+
+**1. GitHub PR Comment**
+```
+🔴 AUTO-ROLLBACK TRIGGERED — payment-service
+
+Failing: v1.4.2 (commit abc123)
+Target:  v1.4.1 (commit def456)
+Reason:  3 consecutive health check failures
+
+Root Cause: "Connection refused on port 5432" (15x)
+Related:    src/config/database.ts
+
+Dashboard: https://sentinel.your-company.com/deployments/abc123
+```
+
+**2. Slack Webhook**
+Same content, formatted as Slack Block Kit message with color coding.
+
+**3. Email (SMTP)**
+HTML-formatted alert to `ALERT_EMAIL` with full RCA summary.
+
+---
+
+### 7.10 Dashboard (Next.js)
+
+**Pages:**
+
+| Page | Description |
+|---|---|
+| `/` | Main dashboard: active deployments, health status, risk indicators, recent alerts |
+| `/deployments` | Full deployment history timeline |
+| `/deployments/[id]` | Deployment detail + RCA panel + health correlation chart |
+| `/deployments/[id]/compare` | Side-by-side comparison with previous deployment |
+| `/graph` | Interactive Neo4j graph visualization of deployment chains |
+| `/services` | Service registry: add, view, manage tracked services |
+| `/rollback` | Rollback console: select target, preview impact, confirm |
+
+**Key UI Components:**
+- `DeploymentCard` — status badge, version, commit, risk score, quick actions
+- `RCAPanel` — root cause analysis output with confidence meter
+- `GraphVisualization` — interactive force-directed graph (react-force-graph)
+- `RollbackConsole` — preview panel + confirm/cancel rollback
+- `HealthTimeline` — response time chart correlated with deployment markers
+- `EnvDriftBadge` — drift status with expandable diff view
+- `ErrorPatternList` — categorized errors with severity and occurrence count
+- `RiskIndicator` — color-coded risk badge with contributing factors
+
+---
+
+### 7.11 Logs Viewer
+
+- Display last **500 log lines per deployment** (MVP scope)
+- Filter by: timestamp, log level, keyword
+- Log source: GitHub Actions workflow logs (fetched via API)
+- Stored in Neo4j temporarily; 7-day retention
+
+---
+
+### 7.12 Service Registry
+
+Teams register their services in Sentinel during installation:
+
+```
+Service name: payment-service
+Repository:   https://github.com/org/payment-service
+Health URL:   https://api.example.com/health
+Environment:  production
+Dependencies: [auth-service, postgres]
+```
+
+Dependencies are modeled as `DEPENDS_ON` relationships in Neo4j — enabling blast radius analysis.
+
+---
+
+## 8. Non-Functional Requirements
 
 ### Performance
-- Dashboard loads in under **3 seconds**
-- API response under **500ms** (average)
-- Health check worker completes cycle in under **10 seconds**
-- Log queries return in under **1 second** (limited to 500 entries)
+- Dashboard loads in < 3 seconds
+- API responses average < 500ms
+- Health check cycle completes across all services in < 10 seconds
+- Graph RCA query returns in < 1 second
 
 ### Reliability
-- Deployment data stored reliably with no data loss
-- Webhook idempotency prevents duplicate records (`workflow_run_id UNIQUE`)
-- Redeploy history preserved
+- Webhook idempotency via `workflow_run_id UNIQUE` constraint in Neo4j
+- Automated rollback must not fire if no safe target exists
+- Health worker must not block the main API thread (runs as separate cron process)
 
 ### Security
-- Secrets never stored in Sentinel database
-- Secrets fetched read-only from GitHub API
-- Sensitive values masked in UI as `***`
-- Never log secrets
-- Basic authentication for dashboard access
-- GitHub API token stored in `.env`
+- Webhook signature verification (`X-Hub-Signature-256`) on all incoming events
+- GitHub secrets never stored — fetched read-only, masked in all UIs
+- JWT authentication for dashboard access
+- GitHub OAuth (NextAuth.js) for login
+- Rate limiting on all public endpoints
+- Helmet.js for HTTP security headers
 
-### Scalability
-The system must support:
-- Multiple repositories (up to 10 for MVP)
-- Multiple environments (dev, staging, prod)
-- Multiple deployments per day (up to 50)
-- Time-series health data without performance degradation
-- Log retention: 7 days, 500 entries per deployment
+### Scalability (Self-Hosted Instance)
+- Neo4j handles graph growth natively without schema migrations; limits are hardware-bound
+- Redis cache absorbs repeated health-check dashboard reads
+- **Health Worker Concurrency:** To avoid blocking the 60s poll window, the worker uses `Promise.all` with a concurrency limiter (`p-limit`, set to 20 parallel requests).
+- **Service Limit:** The MVP recommends a ~50 service limit per instance. Beyond this, the synchronous `p-limit` health worker should be replaced with a distributed task queue (e.g., BullMQ) in V4.
 
 ---
 
-## 8. System Architecture
+## 9. Tech Stack
+
+| Layer | Technology | Version |
+|---|---|---|
+| Backend API | Node.js + Express + TypeScript | 18 LTS / 4.x / 5.x |
+| Primary Database | **Neo4j** | 5.15 (Community) |
+| Cache | Redis | 7 (Alpine) |
+| Frontend | **Next.js (App Router)** | 14 |
+| Graph Visualization | react-force-graph | latest |
+| Charts | Recharts | latest |
+| Auth | NextAuth.js (GitHub OAuth) | 5.x |
+| Notifications | @slack/webhook + Nodemailer | latest |
+| Container | Docker + Docker Compose | — |
+| CI/CD Integration | GitHub Actions (Webhooks + REST API) | — |
+| Future Mobile | React Native | Post-MVP |
+
+---
+
+## 10. System Architecture
 
 ```
-┌─────────────────────────────────────────────────────┐
-│                   Dashboard UI                      │
-│              (Next.js / React)                      │
-└────────────────────┬────────────────────────────────┘
-                     │ HTTP / REST
-┌────────────────────▼────────────────────────────────┐
-│                  Backend API                        │
-│           (Node.js + Express + TypeScript)          │
-│                                                     │
-│  - Deployment metadata    - Rollback logic          │
-│  - Webhook processing     - Health checks           │
-│  - Env config storage                               │
-└──────────┬──────────────────────────┬───────────────┘
-           │                          │
-┌──────────▼──────────┐   ┌───────────▼───────────────┐
-│     PostgreSQL      │   │   GitHub Actions (Webhook) │
-│                     │   │                            │
-│  - deployments      │   │  - build completion events │
-│  - services         │   │  - deployment events       │
-│  - logs             │   └───────────────────────────┘
-│  - env_variables    │
-│  - health_status    │
-└─────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                      Dashboard UI                               │
+│                  (Next.js 14 App Router)                        │
+│                                                                 │
+│  Dashboard │ Deployments │ Graph View │ Rollback Console        │
+└─────────────────────────┬───────────────────────────────────────┘
+                          │  REST + Polling (MVP)
+                          │  SSE deferred to Phase 2
+┌─────────────────────────▼────────────────────────────────────────┐
+│                      Backend API                                 │
+│              (Node.js + Express + TypeScript)                    │
+│                                                                  │
+│  Webhook Processor (idempotent)   RCA Engine (rule-based)        │
+│  Health Worker (60s cron)         Rollback Engine (auto+manual)  │
+│  Git Diff Engine (GitHub API)     Notification Service           │
+│                                   (GH PR + Slack + Email)        │
+└────────────┬───────────────────────────────┬─────────────────────┘
+             │                               │
+┌────────────▼─────────────┐    ┌────────────▼──────────────────┐
+│        Neo4j 5.x         │    │        GitHub API             │
+│    (Primary Store)       │    │                               │
+│                          │    │  Webhooks (events in)         │
+│  Nodes: Service,         │    │  Workflow rerun (rollback)    │
+│  Deployment, Commit,     │    │  Git diff fetch               │
+│  File, ErrorPattern,     │    │  Actions log fetch            │
+│  HealthCheck,            │    │  Secrets read (masked)        │
+│  EnvSnapshot,            │    │  PR comments (alerts)         │
+│  RollbackEvent           │    └───────────────────────────────┘
+│                          │
+│  Relationships encode    │    ┌───────────────────────────────┐
+│  the entire failure      │    │         Redis 7               │
+│  and recovery graph      │    │                               │
+└──────────────────────────┘    │  Health time-series cache     │
+                                │  Rate limiting                │
+                                │  Session store                │
+                                └───────────────────────────────┘
 ```
 
-### Tech Stack
+---
 
-| Layer | Technology |
+## 11. Installation & Setup
+
+### One-Command Start
+```bash
+git clone https://github.com/your-org/ci-cd-sentinel
+cd ci-cd-sentinel
+cp backend/.env.example backend/.env
+# Fill in .env with your tokens
+docker compose up -d
+```
+
+### First-Run Configuration
+1. Open `http://localhost:3000` → login with GitHub OAuth
+2. Register your first service (name, repo URL, health endpoint)
+3. Add GitHub webhook to your repo pointing to `http://your-sentinel-host/webhooks/github`
+4. Configure SMTP and/or Slack webhook in `.env`
+5. Sentinel begins tracking immediately on next pipeline run
+
+---
+
+## 12. API Reference (Summary)
+
+```
+POST /webhooks/github                       Receive GitHub Actions events
+
+GET  /api/services                          List tracked services
+POST /api/services                          Register service
+GET  /api/services/:id/env-drift            Environment drift analysis
+
+GET  /api/deployments                       Deployment history
+GET  /api/deployments/:id                   Deployment detail
+GET  /api/deployments/:id/rca               Root Cause Analysis
+GET  /api/deployments/:id/compare/:prevId   Side-by-side comparison
+GET  /api/deployments/:id/rollback-preview  Preview rollback impact
+POST /api/deployments/:id/rollback          Trigger manual rollback
+POST /api/deployments/:id/redeploy          Trigger redeploy
+GET  /api/deployments/:id/logs              Last 500 log lines
+
+GET  /api/health-status                     Current health per service
+GET  /api/health-status/:serviceId          Health history (time-series)
+
+GET  /api/graph/deployment-chain/:id        Full deployment chain for visualization
+GET  /api/graph/failure-chain/:id           Failure graph for visualization
+GET  /api/graph/service-dependencies        Service dependency graph
+GET  /api/analytics/risk                    File-level historical risk scores
+```
+
+---
+
+## 13. Version Roadmap
+
+CI/CD Sentinel is built across **4 versions** using a spiral team model. Each version is a **complete, independently shippable product** with a single value proposition. All team members work together on each version.
+
+---
+
+### V1 — "See Everything"
+> *Know what's deployed and if it's healthy*
+
+**What ships:**
+1. Docker Compose: Neo4j + Redis + Backend + Frontend
+2. Neo4j schema (constraints + indexes)
+3. Webhook ingestion with idempotency (`workflow_run_id` UNIQUE)
+4. Deployment history tracking (graph model — Service, Deployment, Commit nodes)
+5. Health monitoring worker (60s polling, HealthCheck nodes)
+6. Basic Next.js dashboard (deployment list, health status, service registry)
+7. Manual redeploy trigger (GitHub workflow dispatch)
+
+**V1 team feature assignments:**
+| Member | Feature |
 |---|---|
-| Backend API | Node.js + Express + TypeScript |
-| Database | PostgreSQL |
-| Frontend | Next.js or React |
-| CI/CD Integration | GitHub Actions (Webhooks) |
+| Ganesh (DevOps / Repo Owner) | Docker Compose, Neo4j schema, CI/CD pipeline setup, branch protection |
+| Chinmay (Backend) | Webhook ingestion endpoint + Deployment/Commit node creation |
+| Member 3 | Health worker (60s cron) + HealthCheck nodes + Redis caching |
+| Varsha (Frontend) | Next.js scaffold + dashboard shell (deployment list + health status) |
+
+**V1 exit criteria:** Webhook → graph → dashboard working end-to-end. Verified by sending a real GitHub Actions event and seeing it appear in the UI.
+
+**Integration lead for V1:** Ganesh (repo owner)
 
 ---
 
-## 9. Data Model
-
-```sql
--- Services
-services (
-  id,
-  name,
-  repository_url,
-  created_at
-)
-
--- Deployments
-deployments (
-  id,
-  service_id,
-  version,
-  commit_hash,
-  environment,
-  status,
-  deployed_by,
-  timestamp,
-  git_diff_summary  -- files changed, additions, deletions
-)
-
--- Webhook Events (idempotency)
-webhook_events (
-  id,
-  workflow_run_id UNIQUE,  -- prevents duplicate processing
-  delivery_id,
-  commit_sha,
-  repository_name,
-  workflow_name,
-  status,
-  received_at
-)
-
--- Logs (limited storage)
-logs (
-  id,
-  deployment_id,  -- tied to specific deployment
-  service_id,
-  environment,
-  log_level,
-  message,
-  timestamp
-  -- LIMIT 500 per deployment_id
-  -- Retention: 7 days
-)
-
--- Health Checks (time-series friendly)
-health_checks (
-  id,
-  service_id,
-  environment,
-  status,
-  response_time_ms,  -- track performance trends
-  status_code,
-  checked_at
-)
-
--- Redeploy Events
-redeploy_events (
-  id,
-  deployment_id,
-  triggered_by,
-  target_commit_sha,
-  workflow_run_id,
-  timestamp
-)
-
--- Error Patterns (new)
-error_patterns (
-  id,
-  deployment_id,
-  pattern_type,  -- connection_error, timeout, auth_failure, etc.
-  pattern_text,  -- actual error message
-  occurrence_count,
-  first_seen,
-  severity,  -- critical, warning, info
-  related_file  -- file from git diff that might be related
-)
-
--- Deployment Comparisons (new)
-deployment_comparisons (
-  id,
-  current_deployment_id,
-  previous_deployment_id,
-  git_diff_json,  -- full git diff data
-  health_delta_json,  -- health metric changes
-  env_diff_json,  -- environment variable differences
-  created_at
-)
-```
-
-**Note:** `environment_variables` table removed from MVP. Use read-only GitHub API fetch instead.
-
----
-
-## 10. MVP Scope
-
-### Core Philosophy
-
-> **Deployment-centric root cause analysis for small teams**
-
-When your deployment breaks at 3am:
-- You don't want 50 dashboards
-- You want: What changed? Why did it break? How do I fix it?
-- Sentinel answers those 3 questions in 30 seconds
-
----
-
-### Three-Stage Build Approach
-
-#### Stage 1: Core MVP (Must Have)
-
-**The foundation:**
-
-1. **Webhook ingestion** with idempotency (`workflow_run_id UNIQUE`)
-2. **Deployment history** tracking (who, what, when, status)
-3. **Health monitoring** with response time trends (60s polling)
-4. **Simple dashboard** (latest deployment, success rate, health status)
-5. **Redeploy trigger** (GitHub workflow dispatch API)
-
-**Scope boundary:**
-- Webhook → Database → Dashboard
-- Health worker → Database → Dashboard
-- UI button → GitHub API → Redeploy
-
-**Goal:** Deployment memory + recovery switch working end-to-end.
-
----
-
-#### Stage 2: Root Cause Analysis (High Value)
-
-**The differentiation:**
-
-6. **Deployment comparison view** (working vs broken)
-   - Side-by-side git diff
-   - Health metric deltas (response time, error rate)
-   - Files changed with line-by-line comparison
-
-7. **Error pattern detection**
-   - Parse logs for common failures (connection errors, timeouts, auth failures)
-   - Show error frequency and first occurrence time
-   - Correlate errors with code changes
-
-8. **Git diff integration**
-   - Fetch diff via GitHub API for each deployment
-   - Show which files changed between working and broken deployments
-   - Highlight likely culprit files based on error patterns
-
-**Goal:** Answer "what broke?" in under 60 seconds.
-
----
-
-#### Stage 3: Advanced Features (If Time Permits)
-
-**The polish:**
-
-9. **Environment drift detection**
-   - Compare GitHub Secrets with running container env vars
-   - Show drift indicators
-   - Suggest redeploy to sync
-
-10. **Deployment risk assessment**
-    - Analyze commit size, files changed
-    - Check historical failure patterns
-    - Predict deployment risk (low/medium/high)
-
-11. **Rollback impact preview**
-    - Show what will change before rollback
-    - Expected health status based on historical data
-    - Estimated recovery time
-
-**Goal:** Proactive deployment intelligence.
-
----
-
-### Self-Hosting Demonstration
-
-**Meta-deployment:**
-- Frontend deployed on Vercel
-- Backend deployed on Render
-- Sentinel tracks its own deployments
-- Live demonstration of all features in production
-
-**Benefits:**
-- Proves the system works in real production environment
-- Shows actual deployment history, health monitoring, recovery
-- Allows testing redeploy functionality on live system
-- Demonstrates environment drift detection with real config
-
----
-
-### ❌ Out of Scope (All Stages)
-
-**Avoid these scope creep traps:**
-
-- ❌ Editable secrets manager (becomes Vault competitor)
-- ❌ Full log aggregation pipeline (becomes Elasticsearch)
-- ❌ Artifact storage (becomes Docker registry)
-- ❌ Role-based access control (becomes auth platform)
-- ❌ Multi-cloud deployment tracking
-- ❌ Kubernetes integration
-- ❌ Real-time log streaming
-- ❌ Complex analytics dashboard
-- ❌ Slack alerts (nice to have, but not core)
-
----
-
-### Scope Discipline
-
-> **Ambition kills more projects than difficulty.**
-
-Three features that sound simple but explode:
-
-1. **Secrets manager** → audit logs, rotation, compliance, sync
-2. **Log aggregation** → ingestion pipeline, indexing, retention, search
-3. **Deployment orchestration** → artifact storage, provider APIs, rollback strategies
-
-For all stages: avoid these traps.
-
-**Keep the core tight:**
-- Stage 1: Webhook ingestion + deployment history + health monitoring + dashboard + redeploy
-- Stage 2: Deployment comparison + error patterns + git diff
-- Stage 3: Env drift + risk assessment + rollback preview
-
-Everything else is negotiable.
-
----
-
-## 11. Build Order (Critical)
-
-**Do NOT start with GitHub Actions integration.**  
-Webhook integration depends on backend existing.
-
----
-
-### Stage 1: Core MVP
-
-#### Phase 1 — Backend Foundation
-
-Create API skeleton.
-
-**Endpoints:**
-```
-POST /webhooks/github          # receive GitHub webhooks
-GET  /services                 # list tracked services
-GET  /deployments              # deployment history
-GET  /deployments/:id/logs     # last 500 logs for deployment
-GET  /health-status            # current health status
-POST /deployments/:id/redeploy # trigger GitHub workflow dispatch
-```
-
-**DB Tables:**
-```
-services
-deployments
-webhook_events (with workflow_run_id UNIQUE)
-health_checks
-logs (limited to 500 per deployment)
-redeploy_events
-```
-
-**Goal:** Store pipeline events reliably with idempotency.
-
----
-
-#### Phase 2 — GitHub Webhook Integration
-
-GitHub → Settings → Webhooks → send events to:
-```
-POST /webhooks/github
-```
-
-**Capture:**
-- Repo name
-- Commit SHA
-- Workflow name
-- Status (success/failure)
-- Timestamp
-
-Now Sentinel starts seeing real activity.
-
----
-
-#### Phase 3 — Dashboard (Basic)
-
-**Show:**
-- Latest deployment per service
-- Success rate (last 10 deployments)
-- Last failure with commit link
-- Health status with response time trend
-- Redeploy button (triggers GitHub workflow dispatch)
-- Last 500 logs for selected deployment
-
-**Design principle:** Keep UI boring and readable. DevOps tools are not Instagram.
-
----
-
-#### Phase 4 — Health Monitor Worker
-
-Background job (every 60s):
-```
-check service endpoints
-store response time
-update status
-```
-
-Now system shows: **deploy → health impact**
-
-**Stage 1 Complete:** Deployment memory + recovery switch working.
-
----
-
-### Stage 2: Root Cause Analysis
-
-#### Phase 5 — Git Diff Integration
-
-**Add to webhook processing:**
-- Fetch git diff via GitHub API when deployment received
-- Store diff summary (files changed, additions, deletions)
-- Store full diff for comparison view
-
-**New endpoint:**
-```
-GET /deployments/:id/diff
-```
-
----
-
-#### Phase 6 — Deployment Comparison Engine
-
-**New endpoint:**
-```
-GET /deployments/:id/compare/:previousId
-```
-
-**Returns:**
-- Git diff (side-by-side file changes)
-- Health metric deltas
-- Environment variable differences
-- Error pattern correlation
-
-**Dashboard update:**
-- Add "Compare with previous" button
-- Show side-by-side comparison view
-- Highlight likely culprit files
-
----
-
-#### Phase 7 — Error Pattern Detection
-
-**Add log parsing:**
-- Scan deployment logs for common error patterns
-- Store in `error_patterns` table
-- Correlate with code changes
-
-**Detected patterns:**
-- Connection errors (ECONNREFUSED)
-- Timeouts (ETIMEDOUT)
-- Auth failures (401, 403)
-- Missing env vars (undefined)
-- Port conflicts (EADDRINUSE)
-
-**Dashboard update:**
-- Show error analysis panel
-- Display error frequency and first occurrence
-- Link errors to related files from git diff
-
-**Stage 2 Complete:** Root cause analysis in under 60 seconds.
-
----
-
-### Stage 3: Advanced Features
-
-#### Phase 8 — Environment Drift Detection
-
-**New endpoint:**
-```
-GET /services/:id/env-drift
-```
-
-**Implementation:**
-- Fetch GitHub Secrets via API
-- Compare with last deployment snapshot
-- Show drift indicators
-
-**Dashboard update:**
-- Add env drift panel
-- Show GitHub vs Runtime comparison
-- "Trigger Redeploy to Sync" button
-
----
-
-#### Phase 9 — Deployment Risk Assessment
-
-**Add risk analysis:**
-- Analyze commit size (large changes = higher risk)
-- Check files changed (database schema = higher risk)
-- Historical failure patterns (Friday deployments = higher risk)
-- Similar commit patterns to previous failures
-
-**Dashboard update:**
-- Show risk indicator before deployment
-- Display risk factors
-- Suggest staging deployment first
-
----
-
-#### Phase 10 — Rollback Impact Preview
-
-**New endpoint:**
-```
-GET /deployments/:id/rollback-preview
-```
-
-**Returns:**
-- Target commit details
-- Expected health status (based on historical data)
-- Environment variable snapshot
-- Estimated recovery time
-
-**Dashboard update:**
-- Show preview before rollback
-- "Confirm Rollback" with impact summary
-
-**Stage 3 Complete:** Proactive deployment intelligence.
-
----
-
-### Self-Hosting Setup
-
-**Deploy Sentinel itself:**
-
-1. **Frontend:** Deploy to Vercel
-   - Connect GitHub repo
-   - Auto-deploy on push to main
-   - Environment variables from Vercel dashboard
-
-2. **Backend:** Deploy to Render
-   - Connect GitHub repo
-   - Auto-deploy on push to main
-   - PostgreSQL database on Render
-   - Environment variables from Render dashboard
-
-3. **Configure Sentinel to track itself:**
-   - Add Sentinel's own repo as tracked service
-   - Set up webhook from Sentinel's GitHub Actions to Sentinel's backend
-   - Configure health endpoint to poll Sentinel's own API
-
-**Result:** Sentinel tracking its own deployments (meta-demonstration).
-
----
-
-## 12. Future Enhancements (Post-Stage 3)
-
-| Feature | Priority |
+### V2 — "Fix Faster"
+> *Know what broke and recover in 60 seconds*
+
+**What ships:**
+8. Async LogFetchJob (GitHub Actions zip → parse → ErrorPattern nodes)
+9. Rule-based RCA engine (8 error pattern types, confidence scoring)
+10. Git diff integration (CHANGED_FILE + RELATED_TO_FILE relationships)
+11. Deployment comparison view (working vs broken side-by-side)
+12. Automated rollback engine (Tier 1: health-only + Tier 2: error-correlated)
+13. Three-channel notifications (GitHub PR comment + Slack + Email)
+14. Deployment risk scoring (Layer 1 heuristics, Layer 2 graph-enhanced after 10 deploys)
+
+**V2 team feature assignments (rotates):**
+| Member | Feature |
 |---|---|
-| Multi-environment comparison view | High |
-| Slack / webhook alerts on deployment failure | High |
-| Role-based access control | Medium |
-| Deployment analytics (success rate trends, MTTR) | Medium |
-| Anomaly detection (ML-based health prediction) | Low |
-| Kubernetes integration | Low |
-| Multi-cloud deployment tracking | Low |
+| Ganesh | Automated rollback engine + rollback graph relationships |
+| Chinmay | LogFetchJob pipeline (zip fetch → parse → ErrorPattern nodes) |
+| Member 3 | RCA engine (regex rules, confidence scores, RCA status field) |
+| Varsha | RCA panel UI + deployment comparison page + notification templates |
+
+**V2 exit criteria:** Failed deployment → RCA populated within 5s → rollback fires → all 3 notification channels receive alert.
+
+**Integration lead for V2:** Chinmay
 
 ---
 
-## 13. Success Criteria
+### V3 — "Prevent Failures"
+> *Know what's risky before you push*
 
-The project is considered successful when:
+**What ships:**
+15. Graph-enhanced risk scoring (Layer 2 activates, `graph-enhanced` badge)
+16. Environment drift detection (GitHub Secrets key-presence drift)
+17. Interactive deployment graph visualization (react-force-graph)
+18. Rollback impact preview (show what changes before confirmation)
+19. Service dependency graph (blast radius analysis via `DEPENDS_ON`)
+20. PR/governance checks (large diff warning, critical file alert posted to PR)
 
-### Stage 1 Success:
-- [ ] Deployment history is visible in the dashboard
-- [ ] Webhook ingestion works with idempotency (no duplicate records)
-- [ ] Redeploy button triggers GitHub workflow dispatch successfully
-- [ ] Health status is correctly displayed with response time trends
-- [ ] Health monitoring shows correlation with deployments ("deploy → health impact")
-- [ ] System demonstrates: **deployment memory + recovery switch**
+**V3 team feature assignments:**
+| Member | Feature |
+|---|---|
+| Ganesh | Graph visualization page + service dependency graph |
+| Chinmay | PR governance checks (GitHub API → PR comment) |
+| Member 3 | Layer 2 risk scoring + env drift detection |
+| Varsha | Rollback impact preview UI + risk indicator components |
 
-### Stage 2 Success:
-- [ ] Deployment comparison view shows git diff between working and broken deployments
-- [ ] Error pattern detection identifies common failures in logs
-- [ ] Root cause analysis completes in under 60 seconds
-- [ ] Dashboard shows "what changed, why it broke, how to fix" for failed deployments
+**V3 exit criteria:** Risk score shows `graph-enhanced` label after 10 deployments. Graph page renders deployment chain. Env drift panel shows added/removed secret keys.
 
-### Stage 3 Success:
-- [ ] Environment drift detection shows GitHub Secrets vs Runtime differences
-- [ ] Deployment risk assessment predicts failure probability
-- [ ] Rollback impact preview shows expected outcome before execution
-- [ ] Self-hosted on Vercel + Render, tracking its own deployments
-
-**Not required for success:**
-- ❌ Editable secrets (read-only is enough)
-- ❌ Full log aggregation (500 entries is enough)
-- ❌ Complex analytics (basic history + comparison is enough)
-- ❌ Real-time log streaming (batch fetch is enough)
+**Integration lead for V3:** Member 3
 
 ---
 
-## 14. Summary
+### V4 — "Ship at Scale"
+> *Production-ready for teams*
 
-> **CI/CD Sentinel** is a deployment-centric root cause analysis system for small teams.
+**What ships:**
+21. Enterprise license key validation (`license.sentinel.io`)
+22. Performance hardening (query optimization, index tuning, Redis cache review)
+23. Helm chart for Kubernetes self-hosting
+24. Self-hosting meta-demo (Sentinel tracking its own deployments)
+25. Installation wizard (CLI or web UI for first-run configuration)
+26. Full documentation + API reference
+
+**V4 team feature assignments:**
+| Member | Feature |
+|---|---|
+| Ganesh | Helm chart + Docker production config + meta-demo setup |
+| Chinmay | Enterprise license validation + performance hardening |
+| Member 3 | Installation wizard + health checks + production readiness |
+| Varsha | Onboarding UI + documentation site + API reference |
+
+**V4 exit criteria:** One-command install works on a fresh VM. Sentinel is tracking its own deployments. License key gates enterprise features.
+
+**Integration lead for V4:** Varsha
+
+---
+
+### Post-V4 Roadmap
+| Feature | Notes |
+|---|---|
+| LLM-assisted RCA | Send error context + diff to Gemini/OpenAI for natural language explanation |
+| SSE (Server-Sent Events) | Real-time dashboard updates — replace polling. Deferred: non-trivial with Next.js App Router + RSC. |
+| React Native mobile app | Push alerts, quick rollback from mobile |
+| Sentinel Cloud | Managed hosted offering (Phase 3 of business model) |
+| GitLab CI integration | Extend beyond GitHub |
+| RBAC / SSO | Full enterprise edition |
+| Neo4j GDS | Anomaly detection — **requires Neo4j Enterprise edition upgrade** |
+
+**Dashboard Polling Intervals (V1–V3 MVP):**
+- Main dashboard: every 10 seconds
+- Deployment detail page (active deploy): every 5 seconds
+- RCA panel (`rca_status = pending`): every 3 seconds until complete
+- Health status: every 15 seconds
+
+---
+
+## 14. Team Workflow
+
+**Model: Spiral — all 4 members work on every version together.**
+
+```
+Version start
+  ↓
+All 4 members take feature slices (not layer ownership)
+  ↓
+Each works on feature/* branch
+  ↓
+PR to dev → integration lead reviews → merge
+  ↓
+When all features pass on dev → integration lead merges dev → main
+  ↓
+Next version begins
+```
+
+**Branch rules:**
+- `main` — stable, production-ready. Tagged `v1.0`, `v2.0`, etc. on version completion.
+- `dev` — integration branch. All PRs merge here first.
+- `feature/*` — individual work. Never pushed to `main` directly.
+
+**Integration lead per version (rotates):**
+- V1: Ganesh (repo owner)
+- V2: Chinmay
+- V3: Member 3
+- V4: Varsha
+
+The integration lead owns the `dev` branch health, reviews all PRs for their version, and makes the merge-to-`main` call.
+
+---
+
+## 15. Out of Scope (All Versions)
+
+| Feature | Reason |
+|---|---|
+| Editable secrets manager | Becomes Vault competitor — enormous scope |
+| Full log aggregation pipeline | Becomes Elasticsearch — enormous scope |
+| Artifact storage | Docker registry territory |
+| Real-time log streaming | WebSocket infra complexity, not core value |
+| Kubernetes integration | ArgoCD territory — out of lane |
+| Multi-cloud deployment tracking | Phase 3+ at earliest |
+| Complex RBAC | Enterprise edition, Phase 3 |
+| Slack alerts without rollback | Not the core loop — add with rollback or not at all |
+
+---
+
+## 16. Success Criteria
+
+### V1 — See Everything
+- [ ] Real GitHub Actions webhook received and stored as Deployment node (no duplicates on retry)
+- [ ] Deployment history visible and traversable in Neo4j graph
+- [ ] Health monitoring shows deployment-correlated health state in dashboard
+- [ ] Manual redeploy triggers GitHub workflow dispatch successfully
+- [ ] `dev → main` merge made with all 4 members having committed working code
+
+### V2 — Fix Faster
+- [ ] LogFetchJob fetches and parses GitHub Actions zip logs successfully
+- [ ] RCA panel populates within 5 seconds of viewing a failed deployment
+- [ ] Automated rollback fires within 5 minutes of health degradation (Tier 1)
+- [ ] All 3 notification channels receive rollback alert with correct payload
+- [ ] Deployment comparison shows git diff between working and broken versions
+- [ ] Risk score displayed on every new deployment (heuristic label on fresh install)
+
+### V3 — Prevent Failures
+- [ ] Risk score shows `graph-enhanced` label after 10+ deployments
+- [ ] Interactive graph visualization renders deployment chain correctly
+- [ ] Environment drift panel shows added/removed secret keys
+- [ ] Rollback impact preview renders before confirmation step
+- [ ] PR governance check posts comment to GitHub PR
+
+### V4 — Ship at Scale
+- [ ] One-command install (`docker compose up -d`) works on a fresh VM
+- [ ] Sentinel tracking its own deployments (meta-demo live)
+- [ ] Enterprise license key gates advanced features (license.sentinel.io check)
+- [ ] Helm chart deploys Sentinel to a k8s cluster successfully
+
+---
+
+## 17. Summary
+
+> **CI/CD Sentinel** is a self-hosted, Neo4j-powered intelligent deployment observability platform for engineering teams who care about deployment reliability without enterprise complexity.
+
+Built in 4 versions by a 4-person team using a spiral model:
+
+| Version | Tagline | Core Value |
+|---|---|---|
+| **V1** | See Everything | Know what's deployed and if it's healthy |
+| **V2** | Fix Faster | Know what broke and recover in 60 seconds |
+| **V3** | Prevent Failures | Know what's risky before you push |
+| **V4** | Ship at Scale | Production-ready for teams |
 
 When your deployment breaks at 3am, you don't want 50 dashboards.
 
-You want answers:
-- **What changed?** → Git diff between working and broken deployments
-- **Why did it break?** → Error pattern detection + code correlation
-- **How do I fix it?** → One-click rollback with impact preview
+You want:
+- **What changed?** → Graph traversal: commit → files → deployment chain
+- **Why did it break?** → Rule-based error pattern detection correlated with code changes
+- **How do I fix it?** → Automated rollback to last healthy deployment, with full audit trail
 
-Sentinel answers those 3 questions in 30 seconds.
+Sentinel answers those 3 questions — and takes action — in under 60 seconds.
 
-Not a CI/CD platform. Not an observability platform. Not a secrets manager.
+**Not a CI/CD platform. Not a full observability stack. Not a secrets manager.**
 
-Just: **deployment memory + automated root cause analysis + recovery control**.
+Just: **deployment graph intelligence + automated recovery + team notification.**
