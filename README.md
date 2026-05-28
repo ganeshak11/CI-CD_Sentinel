@@ -320,7 +320,7 @@ Enterprise features are gated via `SENTINEL_LICENSE_KEY`. The core platform alwa
 |---|---|---|
 | Repo Owner / DevOps | Ganesh | Docker Compose, Neo4j schema, CI/CD setup |
 | Backend | Chinmay | Webhook ingestion, Deployment node creation |
-| Member 3 | — | Health worker, HealthCheck nodes, Redis |
+| Abdul | Health worker, HealthCheck nodes, Redis |
 | Frontend | Varsha | Next.js scaffold, dashboard shell |
 
 ---

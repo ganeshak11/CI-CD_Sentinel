@@ -684,12 +684,12 @@ CI/CD Sentinel is built across **4 versions** using a spiral team model. Each ve
 |---|---|
 | Ganesh (DevOps / Repo Owner) | Docker Compose, Neo4j schema, CI/CD pipeline setup, branch protection |
 | Chinmay (Backend) | Webhook ingestion endpoint + Deployment/Commit node creation |
-| Member 3 | Health worker (60s cron) + HealthCheck nodes + Redis caching |
+| Abdul | Health worker (60s cron) + HealthCheck nodes + Redis caching |
 | Varsha (Frontend) | Next.js scaffold + dashboard shell (deployment list + health status) |
 
 **V1 exit criteria:** Webhook → graph → dashboard working end-to-end. Verified by sending a real GitHub Actions event and seeing it appear in the UI.
 
-**Integration lead for V1:** Ganesh (repo owner)
+**Integration lead for V1:** Ganesh
 
 ---
 
@@ -710,12 +710,12 @@ CI/CD Sentinel is built across **4 versions** using a spiral team model. Each ve
 |---|---|
 | Ganesh | Automated rollback engine + rollback graph relationships |
 | Chinmay | LogFetchJob pipeline (zip fetch → parse → ErrorPattern nodes) |
-| Member 3 | RCA engine (regex rules, confidence scores, RCA status field) |
+| Abdul | RCA engine (regex rules, confidence scores, RCA status field) |
 | Varsha | RCA panel UI + deployment comparison page + notification templates |
 
 **V2 exit criteria:** Failed deployment → RCA populated within 5s → rollback fires → all 3 notification channels receive alert.
 
-**Integration lead for V2:** Chinmay
+**Integration lead for V2:** Any team member
 
 ---
 
@@ -735,12 +735,12 @@ CI/CD Sentinel is built across **4 versions** using a spiral team model. Each ve
 |---|---|
 | Ganesh | Graph visualization page + service dependency graph |
 | Chinmay | PR governance checks (GitHub API → PR comment) |
-| Member 3 | Layer 2 risk scoring + env drift detection |
+| Abdul | Layer 2 risk scoring + env drift detection |
 | Varsha | Rollback impact preview UI + risk indicator components |
 
 **V3 exit criteria:** Risk score shows `graph-enhanced` label after 10 deployments. Graph page renders deployment chain. Env drift panel shows added/removed secret keys.
 
-**Integration lead for V3:** Member 3
+**Integration lead for V3:** Any team member
 
 ---
 
@@ -758,14 +758,11 @@ CI/CD Sentinel is built across **4 versions** using a spiral team model. Each ve
 **V4 team feature assignments:**
 | Member | Feature |
 |---|---|
-| Ganesh | Helm chart + Docker production config + meta-demo setup |
-| Chinmay | Enterprise license validation + performance hardening |
-| Member 3 | Installation wizard + health checks + production readiness |
-| Varsha | Onboarding UI + documentation site + API reference |
+| Ganesh | Helm chart + Docker production config + meta-demo setup, Enterprise license validation + performance hardening, Installation wizard + health checks + production readiness, Onboarding UI + documentation site + API reference |
 
 **V4 exit criteria:** One-command install works on a fresh VM. Sentinel is tracking its own deployments. License key gates enterprise features.
 
-**Integration lead for V4:** Varsha
+**Integration lead for V4:** Any team member
 
 ---
 
@@ -814,7 +811,7 @@ Next version begins
 **Integration lead per version (rotates):**
 - V1: Ganesh (repo owner)
 - V2: Chinmay
-- V3: Member 3
+- V3: Abdul
 - V4: Varsha
 
 The integration lead owns the `dev` branch health, reviews all PRs for their version, and makes the merge-to-`main` call.
