@@ -1,4 +1,4 @@
-# CI/CD Sentinel — Architecture Document
+# CI-CD_Sentinel — Architecture Document
 
 ![Version](https://img.shields.io/badge/version-V1--See%20Everything-blueviolet)
 ![Deployment](https://img.shields.io/badge/deployment-Self--Hosted%20OSS-green)
@@ -9,26 +9,31 @@
 
 ## 1. Deployment Model
 
-**CI/CD Sentinel is a self-hosted, open-source tool.**
+**CI-CD_Sentinel is a self-hosted, open-source tool.**
 
-Each team or company deploys their own private instance inside their own cloud infrastructure. The tool runs as a sidecar to their application stack — monitoring CI/CD pipelines, performing graph-based root cause analysis, and triggering automated rollbacks.
+Each team or company deploys **one centralized Sentinel instance per environment** inside their own cloud infrastructure. Sentinel is NOT deployed as a sidecar per microservice — it is a single control plane that monitors all services via one shared Neo4j graph.
 
 ```
-[Customer Cloud]
-┌─────────────────────────────────────────────────────┐
-│                                                     │
-│   ┌─────────────────┐     ┌────────────────────┐    │
-│   │  Their Apps /   │     │  CI/CD Sentinel    │    │
-│   │  Microservices  │◄────│  (Docker Compose)  │    │
-│   └─────────────────┘     │                    │    │
-│                           │  ┌─────────────┐   │    │
-│   ┌─────────────────┐     │  │   Neo4j     │   │    │
-│   │  GitHub Actions │────►│  │   Redis     │   │    │
-│   │  (Webhooks)     │     │  │   Backend   │   │    │
-│   └─────────────────┘     │  │   Frontend  │   │    │
-│                           │  └─────────────┘   │    │
-│                           └────────────────────┘    │
-└─────────────────────────────────────────────────────┘
+[Customer Cloud / VPC]
+┌──────────────────────────────────────────────────────────────┐
+│                                                              │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐                   │
+│  │ auth-svc │  │ pay-svc  │  │ notif-svc│  (N services)     │
+│  │ repo #1  │  │ repo #2  │  │ repo #3  │                   │
+│  └────┬─────┘  └────┬─────┘  └────┬─────┘                   │
+│       │             │             │                          │
+│       │  GitHub Org-Level Webhook (single URL)               │
+│       └─────────────┼─────────────┘                          │
+│                     ▼                                        │
+│           ┌─────────────────────┐                            │
+│           │   CI-CD_Sentinel    │                            │
+│           │   (One Instance)    │                            │
+│           │                     │                            │
+│           │  Neo4j + Redis      │                            │
+│           │  Backend API        │                            │
+│           │  Next.js Dashboard  │                            │
+│           └─────────────────────┘                            │
+└──────────────────────────────────────────────────────────────┘
 
                     [Sentinel License Server]
                     ┌──────────────────────────┐
@@ -36,6 +41,45 @@ Each team or company deploys their own private instance inside their own cloud i
                     │  (Enterprise validation) │    enterprise features
                     └──────────────────────────┘
 ```
+
+### Why Centralized (Not Per-Microservice)?
+
+If each microservice had its own Sentinel with an isolated Neo4j, the `DEPENDS_ON` relationships between services would be impossible to model. The entire blast radius analysis and cross-service RCA would break. **A single connected graph across all services is the core value proposition.**
+
+### Webhook-to-Service Matching (Microservice & Monorepo)
+
+All GitHub repos send webhooks to one Sentinel endpoint: `POST /webhooks/github`. Sentinel identifies which service(s) to attach data to:
+
+**Microservice repos (1 repo = 1 service):**
+1. Webhook arrives → extract `repository.full_name` (e.g., `your-org/payment-service`)
+2. Query Neo4j: `MATCH (s:Service {repo_url: $repoUrl}) RETURN s`
+3. If matched → process the deployment and attach it to that service
+4. If not matched → repo is not tracked; return `200 OK`, skip processing
+
+**Monorepo (1 repo = N services):**
+1. Webhook arrives → extract `repository.full_name` (e.g., `your-org/main-platform`)
+2. Multiple `Service` nodes found for that repo
+3. Sentinel calls GitHub API: `GET /repos/{owner}/{repo}/commits/{sha}` to get changed files
+4. Each service's `path_filter` (glob) is matched against changed files
+5. Only services with matching paths get a `Deployment` node
+6. If `path_filter` is empty → matches all webhooks from that repo (default microservice behavior)
+
+### GitHub Organization-Level Webhooks
+
+Instead of adding the webhook URL to each repo individually, DevOps teams add it **once** at the GitHub Organization level (`Settings → Webhooks`). GitHub forwards `workflow_run` events from all repos to Sentinel. Sentinel only processes repos that are registered in its Service Registry.
+
+### Multi-Architecture & Multi-Org Support
+
+Because Sentinel identifies services using the absolute `owner/repo` string and silently ignores unregistered repositories, it is completely agnostic to how a company organizes their GitHub:
+
+**Case 1: Single Org, Multiple Architectures (`org/arch1-svc`, `org/arch2-svc`)**
+- DevOps adds **one** webhook at the `org` level.
+- **Option A (Global Sentinel):** Deploy one Sentinel instance. The graph will naturally form two disconnected "islands" of nodes. If an `arch1` service goes down, the lack of `DEPENDS_ON` edges proves `arch2` is safe.
+- **Option B (Isolated Sentinels):** Deploy two Sentinel instances (one per architecture). Because Sentinel ignores unregistered repos, Sentinel 1 silently drops `arch2` webhooks, and Sentinel 2 silently drops `arch1` webhooks.
+
+**Case 2: Multiple Orgs (`org-ecommerce/svc`, `org-payments/svc`)**
+- DevOps adds webhooks to **both** GitHub Organizations pointing to the **same** Sentinel instance URL, using the same webhook secret.
+- Sentinel ingests all webhooks seamlessly because it matches against the full `owner/repo` string in its registry regardless of origin.
 
 ### Why Self-Hosted?
 
@@ -150,6 +194,7 @@ Startup sequence:
   id: String,              // UUID
   name: String,            // "payment-service"
   repo_url: String,        // "https://github.com/org/payment-service"
+  path_filter: String,     // Monorepo glob: "services/payment/**" (empty = match all, standard microservice)
   health_endpoint: String, // "https://api.example.com/health"
   environment: String,     // "production" | "staging" | "dev"
   registered_at: DateTime
@@ -450,7 +495,7 @@ GET /api/analytics/risk                 File-level historical risk scores
 ### One-Command Install (Docker Compose)
 
 ```bash
-curl -sSL https://get.sentinel-ci.io | bash
+curl -sSL https://get.ci-cd-sentinel.io | bash
 # OR
 docker compose up -d
 ```
@@ -468,6 +513,30 @@ On first run, a CLI wizard or web UI collects:
 6. Neo4j connection (use bundled or external AuraDB)
 7. Enterprise license key (optional)
 ```
+
+### Service Registration (Bulk Methods)
+
+Manually registering services one-by-one is impractical for microservice architectures. Sentinel supports 3 registration strategies:
+
+**Method 1 — YAML Config Import (V1):**
+```yaml
+# sentinel-services.yml
+services:
+  - name: payment-service
+    repo: https://github.com/org/payment-service
+    health_url: http://payment-svc.internal:8080/health
+    environment: production
+    dependencies: [auth-service, postgres]
+```
+```bash
+sentinel import --file sentinel-services.yml
+```
+
+**Method 2 — GitHub API Auto-Discovery (V2/V3):**
+Sentinel calls `GET /orgs/{org}/repos` to list all repos. DevOps engineer selects which services to track, fills in health URLs, and clicks "Register All."
+
+**Method 3 — Zero-Config Auto-Registration (V4):**
+When the first webhook arrives from an unknown repo, Sentinel creates a `Service` node with status `unconfirmed`. The engineer activates it by filling in the health URL.
 
 ### Environment Variables
 

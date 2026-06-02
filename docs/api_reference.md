@@ -12,6 +12,7 @@ Receives webhook events from GitHub Actions.
 - **Headers:** `X-Hub-Signature-256` required for validation.
 - **Payload:** GitHub `workflow_job` or `workflow_run` JSON.
 - **Response:** `202 Accepted` (processing is asynchronous).
+- **Note:** Supports both per-repo and GitHub Organization-level webhooks. Sentinel matches `repository.full_name` from the payload against registered services. Unregistered repos are silently skipped with `200 OK`.
 
 ---
 
@@ -90,9 +91,27 @@ Register a new service to track.
   {
     "name": "payment-service",
     "github_repo": "org/payment-service",
-    "health_url": "https://api.example.com/health"
+    "health_url": "http://payment-svc.internal:8080/health",
+    "environment": "production",
+    "path_filter": "",
+    "dependencies": ["auth-service", "postgres"],
+    "rollback_strategy": "rerun"
   }
   ```
+- **Fields:**
+  - `name` (required): Internal service name
+  - `github_repo` (required): GitHub `owner/repo` — used to match incoming webhooks via `repository.full_name`
+  - `health_url` (required): Internal URL Sentinel will poll every 60s (can be VPC-internal since Sentinel is self-hosted)
+  - `environment` (optional): `production` | `staging` | `development`
+  - `path_filter` (optional): Glob pattern for monorepo support (e.g., `services/payment/**`). If empty, the service matches all webhooks from the repo (standard microservice behavior). Multiple services can share the same `github_repo` with different `path_filter` values.
+  - `dependencies` (optional): Array of other registered service names — creates `DEPENDS_ON` relationships for blast radius analysis
+  - `rollback_strategy` (optional): `rerun` (default — re-run previous successful workflow) | `workflow_dispatch` (trigger a specific workflow)
+
+### `POST /api/services/import`
+Bulk import services from a YAML config file.
+- **Content-Type:** `multipart/form-data`
+- **Body:** `file` field containing a `sentinel-services.yml` file
+- **Response:** `201 Created` with count of services registered and any errors
 
 ### `GET /api/services/:id/env-drift`
 Compare the GitHub Secrets key presence between the latest deployment and the previous one.

@@ -1,6 +1,6 @@
 # Sentinel Project & Operations Checklist
 
-This checklist tracks the entire lifecycle of the CI/CD Sentinel project from a repository owner's perspective — from local development to open-source distribution.
+This checklist tracks the entire lifecycle of the CI-CD_Sentinel project from a repository owner's perspective — from local development to open-source distribution.
 
 ---
 
@@ -62,6 +62,16 @@ This checklist tracks the entire lifecycle of the CI/CD Sentinel project from a 
 - [ ] **Extraction Test:** User extracts the archive and copies `.env.example` to `.env`.
 - [ ] **Boot Test:** User runs `docker compose up -d` and the pre-built images pull and start in under 30 seconds.
 - [ ] **First-run Wizard:** The user can access the dashboard, register their first service, and input their GitHub OAuth credentials.
+- [ ] **Service Registration — Single:** Register one service via the UI at `/services/new` (name, repo URL, health URL, environment, dependencies).
+- [ ] **Service Registration — Bulk Import:** Import a `sentinel-services.yml` via `sentinel import --file sentinel-services.yml` and verify all services appear in the dashboard.
+- [ ] **Service Registration — Auto-Discovery (V2+):** Connect GitHub Org via OAuth, see repo list, select services to track.
+- [ ] **Webhook Setup — Per-Repo:** Add Sentinel webhook to a single GitHub repo and verify webhook events arrive.
+- [ ] **Webhook Setup — Org-Level:** Add Sentinel webhook once at GitHub Organization level and verify events from multiple repos are correctly routed to their registered services.
+- [ ] **Health Monitoring Activation:** Confirm health worker starts polling immediately after service registration (before any deployment).
+- [ ] **Unregistered Repo Filtering:** Send a webhook from a repo NOT registered in Sentinel and verify it returns `200 OK` without creating any nodes.
+- [ ] **Monorepo Registration:** Register 2+ services with the same `repo_url` but different `path_filter` globs (e.g., `services/auth/**` and `services/payment/**`).
+- [ ] **Monorepo Webhook Routing:** Push a commit that only changes `services/payment/config.ts` and verify that ONLY `payment-service` gets a new `Deployment` node — `auth-service` must NOT get one.
+- [ ] **Monorepo Full-Repo Change:** Push a commit that changes files across multiple service paths and verify ALL matching services get `Deployment` nodes.
 
 ---
 

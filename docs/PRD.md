@@ -1,4 +1,4 @@
-# CI/CD Sentinel — Product Requirements Document
+# CI-CD_Sentinel — Product Requirements Document
 
 ![Version](https://img.shields.io/badge/version-v1.0--See%20Everything-blueviolet)
 ![Type](https://img.shields.io/badge/type-Self--Hosted%20OSS%20DevOps%20Tool-green)
@@ -10,7 +10,7 @@
 
 ## 1. Product Vision
 
-**CI/CD Sentinel** is a **self-hosted, open-source intelligent deployment observability platform** powered by a Neo4j graph database.
+**CI-CD_Sentinel** is a **self-hosted, open-source intelligent deployment observability platform** powered by a Neo4j graph database.
 
 It runs alongside a team's existing application stack, connects to GitHub Actions via webhooks, and provides:
 
@@ -50,14 +50,14 @@ It runs alongside a team's existing application stack, connects to GitHub Action
 
 ## 2. Deployment Model
 
-**CI/CD Sentinel is self-hosted.** Each team deploys their own private instance inside their own cloud infrastructure.
+**CI-CD_Sentinel is self-hosted.** Each team deploys their own private instance inside their own cloud infrastructure.
 
 ```
 [Customer Cloud]
 ┌──────────────────────────────────────────────────────┐
 │                                                      │
 │   ┌─────────────────┐     ┌────────────────────┐     │
-│   │  Their Apps /   │     │  CI/CD Sentinel    │     │
+│   │  Their Apps /   │     │  CI-CD_Sentinel    │     │
 │   │  Microservices  │◄────│  (Docker Compose)  │     │
 │   └─────────────────┘     │                    │     │
 │                           │  Neo4j + Redis     │     │
@@ -75,6 +75,75 @@ It runs alongside a team's existing application stack, connects to GitHub Action
 - **Compliance** — customer manages their own data retention and regulatory requirements
 - **Scale** — each instance scales independently; no multi-tenant complexity
 - **Trust** — DevOps engineers audit what they run
+
+### Centralized Architecture for Microservices
+
+> **Critical Design Decision:** Sentinel is deployed as a **single centralized instance per environment** — NOT as a sidecar per microservice.
+
+In a company running 50 microservices across 50 GitHub repositories, you do NOT deploy 50 Sentinel instances. You deploy **one** Sentinel that ingests webhooks from all 50 repos into a single Neo4j graph.
+
+**Why centralized?** If each microservice had its own Sentinel with its own isolated Neo4j, the `DEPENDS_ON` relationships between services would be impossible to model. The entire blast radius analysis and cross-service RCA would break. A single graph is the whole point.
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     Customer VPC                            │
+│                                                             │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐                   │
+│  │ auth-svc │  │ pay-svc  │  │ notif-svc│  (50 services)    │
+│  │ repo #1  │  │ repo #2  │  │ repo #3  │                   │
+│  └────┬─────┘  └────┬─────┘  └────┬─────┘                   │
+│       │             │             │                          │
+│       │  GitHub Org-Level Webhook (single URL)               │
+│       └─────────────┼─────────────┘                          │
+│                     ▼                                        │
+│           ┌─────────────────────┐                            │
+│           │   CI-CD_Sentinel    │                            │
+│           │   (One Instance)    │                            │
+│           │                     │                            │
+│           │  Neo4j: ALL 50      │                            │
+│           │  services in ONE    │                            │
+│           │  connected graph    │                            │
+│           └─────────────────────┘                            │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Webhook-to-Service Matching (Supports Both Microservice & Monorepo):**
+
+Sentinel supports two repository architectures:
+
+**Microservice repos (1 repo = 1 service):**
+1. Webhook arrives → extract `repository.full_name` (e.g., `your-org/payment-service`)
+2. Sentinel queries Neo4j: `MATCH (s:Service {repo_url: $repoUrl}) RETURN s`
+3. Exactly one `Service` matches → create `Deployment` node for that service
+4. If no match → repo is not tracked; return `200 OK`, skip processing
+
+**Monorepo (1 repo = N services):**
+1. Webhook arrives → extract `repository.full_name` (e.g., `your-org/main-platform`)
+2. Sentinel finds **multiple** `Service` nodes registered to that repo
+3. Sentinel calls GitHub API: `GET /repos/{owner}/{repo}/commits/{sha}` to get the list of files changed in the commit
+4. For each registered service, Sentinel matches changed file paths against the service's `path_filter` (glob pattern, e.g., `services/payment/**`)
+5. Only services whose `path_filter` matches at least one changed file get a new `Deployment` node
+6. Services whose paths were NOT touched are skipped — no false deployments
+
+```yaml
+# Monorepo registration example
+services:
+  - name: auth-service
+    repo: https://github.com/org/main-platform
+    path_filter: "services/auth/**"          # ← only triggers on auth changes
+    health_url: http://auth-svc.internal:8080/health
+
+  - name: payment-service
+    repo: https://github.com/org/main-platform
+    path_filter: "services/payment/**"       # ← only triggers on payment changes
+    health_url: http://payment-svc.internal:8081/health
+```
+
+> **path_filter behavior:** If `path_filter` is empty or not set, the service matches ALL webhooks from that repo (standard microservice behavior). If set, it acts as a glob filter against the commit's changed files.
+
+**GitHub Organization-Level Webhooks:**
+
+Instead of adding the Sentinel webhook URL to each of the 50 repositories individually, DevOps teams can add it **once** at the GitHub Organization level (`Settings → Webhooks`). GitHub will then forward `workflow_run` events from **all** repositories in the organization to Sentinel. Sentinel filters and processes only the repos that are registered in its Service Registry.
 
 ### Business Model (Phased)
 
@@ -199,7 +268,7 @@ The system must:
 
 | Node | Key Properties | Description |
 |---|---|---|
-| `Service` | id, name, repo_url, health_endpoint, environment | A tracked microservice or application |
+| `Service` | id, name, repo_url, path_filter, health_endpoint, environment | A tracked microservice or application. `path_filter` is a glob pattern for monorepo support (e.g., `services/payment/**`). If empty, matches all webhooks from the repo. |
 | `Deployment` | id, workflow_run_id (UNIQUE), version, commit_sha, status, completed_at, webhook_received_at, risk_score | A pipeline execution. Stores both timestamps — rollback window uses `completed_at`. |
 | `Commit` | sha (UNIQUE), message, author, branch, additions, deletions, files_changed | Git commit metadata |
 | `File` | path, language, change_type | A file modified in a commit |
@@ -506,19 +575,84 @@ HTML-formatted alert to `ALERT_EMAIL` with full RCA summary.
 
 ---
 
-### 7.12 Service Registry
+### 7.12 Service Registry & Onboarding Flow
 
-Teams register their services in Sentinel during installation:
+To ensure Sentinel can correctly map GitHub webhooks to internal running services, teams must explicitly register their services in the Sentinel Dashboard.
+
+**Step-by-Step UI Registration Flow (`/services/new`):**
+
+1. **Service Identification:**
+   - **Service Name (String):** User inputs the internal name of the service (e.g., `payment-service`).
+   - **Environment (Dropdown):** User selects the environment (`production`, `staging`, `development`).
+2. **GitHub Mapping (The Webhook Link):**
+   - **Repository URL (String):** User inputs the exact GitHub repository URL (e.g., `https://github.com/your-org/payment-service`). 
+   - **Path Filter (String, optional):** For monorepo setups, user inputs a glob pattern to scope this service to a subdirectory (e.g., `services/payment/**`). If left empty, the service matches all webhooks from the repo (standard microservice behavior).
+   - *Architecture Note:* This is the exact string Sentinel will use to match incoming `workflow_run` webhooks to this service. For monorepos, multiple services can share the same repo URL but with different `path_filter` values.
+3. **Health Monitoring Configuration:**
+   - **Health Endpoint URL (String):** User inputs the internal HTTP/HTTPS URL that Sentinel will poll. Because Sentinel is self-hosted inside the VPC, this can be a private internal IP or local DNS (e.g., `http://payment-svc.internal:8080/health`).
+   - **Polling Interval (Number, optional):** Defaults to 60 seconds.
+4. **Dependency Mapping (Blast Radius):**
+   - **Dependencies (Multi-select):** User selects other previously registered services that this service depends on (e.g., `postgres-db`, `auth-service`).
+   - *Architecture Note:* This creates `DEPENDS_ON` relationships in Neo4j. If `postgres-db` goes down, Sentinel can traverse the graph to know `payment-service` is also affected.
+5. **Advanced Rollback Config (Optional):**
+   - **Rollback Strategy (Radio):** Select between `Re-run previous successful GitHub workflow` (Default) OR `Trigger specific workflow_dispatch event`.
+
+**Post-Registration Action:**
+Upon clicking "Register", the backend creates a `Service` node in Neo4j with all provided properties. The UI immediately directs the user to a "Setup Webhook" page containing the exact payload URL and secret they need to copy into their GitHub Repository Settings.
+
+#### Bulk Registration Methods (For Microservice Architectures)
+
+Manually registering 50 services through a UI form is impractical. Sentinel supports multiple registration strategies:
+
+**Method 1 — YAML Config Import (V1):**
+
+DevOps teams write a single config file and import it via CLI:
+
+```yaml
+# sentinel-services.yml
+services:
+  - name: payment-service
+    repo: https://github.com/org/payment-service
+    health_url: http://payment-svc.internal:8080/health
+    environment: production
+    dependencies: [auth-service, postgres]
+
+  - name: auth-service
+    repo: https://github.com/org/auth-service
+    health_url: http://auth-svc.internal:8081/health
+    environment: production
+    dependencies: [postgres]
+
+  - name: notification-service
+    repo: https://github.com/org/notification-service
+    health_url: http://notif-svc.internal:8082/health
+    environment: production
+    dependencies: [auth-service]
+```
+
+```bash
+sentinel import --file sentinel-services.yml
+```
+
+All services are created as `Service` nodes in Neo4j with their `DEPENDS_ON` relationships in a single transaction. This aligns with how DevOps teams work — infrastructure-as-code, not UI clicks.
+
+**Method 2 — GitHub API Auto-Discovery (V2/V3):**
+
+When the DevOps engineer connects Sentinel to their GitHub Organization via OAuth, Sentinel calls `GET /orgs/{org}/repos` to fetch all repositories. The UI presents a checklist:
 
 ```
-Service name: payment-service
-Repository:   https://github.com/org/payment-service
-Health URL:   https://api.example.com/health
-Environment:  production
-Dependencies: [auth-service, postgres]
+☑️ payment-service       → Fill health URL: ___________
+☑️ auth-service           → Fill health URL: ___________
+☑️ notification-service   → Fill health URL: ___________
+☐ company-handbook        (skip — not a deployable service)
+☐ design-assets           (skip — not a deployable service)
 ```
 
-Dependencies are modeled as `DEPENDS_ON` relationships in Neo4j — enabling blast radius analysis.
+The engineer checks the services they want to track, fills in health URLs, and clicks "Register All."
+
+**Method 3 — Zero-Config Auto-Registration (V4):**
+
+Sentinel requires no pre-registration. When the first webhook arrives from an unknown repo, Sentinel automatically creates a `Service` node with status `unconfirmed`. The DevOps engineer sees a notification in the dashboard: *"New service detected: payment-service. Configure health endpoint to activate monitoring."* They fill in the health URL to activate full tracking.
 
 ---
 
@@ -616,8 +750,8 @@ Dependencies are modeled as `DEPENDS_ON` relationships in Neo4j — enabling bla
 
 ### One-Command Start
 ```bash
-git clone https://github.com/your-org/ci-cd-sentinel
-cd ci-cd-sentinel
+git clone https://github.com/ganeshak11/CI-CD_Sentinel
+cd CI-CD_Sentinel
 cp backend/.env.example backend/.env
 # Fill in .env with your tokens
 docker compose up -d
@@ -663,7 +797,7 @@ GET  /api/analytics/risk                    File-level historical risk scores
 
 ## 13. Version Roadmap
 
-CI/CD Sentinel is built across **4 versions** using a spiral team model. Each version is a **complete, independently shippable product** with a single value proposition. All team members work together on each version.
+CI-CD_Sentinel is built across **4 versions** using a spiral team model. Each version is a **complete, independently shippable product** with a single value proposition. All team members work together on each version.
 
 ---
 
@@ -769,6 +903,7 @@ CI/CD Sentinel is built across **4 versions** using a spiral team model. Each ve
 ### Post-V4 Roadmap
 | Feature | Notes |
 |---|---|
+| External Metrics Integration | Ingest webhooks from Prometheus / Grafana / Datadog (`POST /webhooks/alerts`) to trigger automated rollbacks based on infra metrics (CPU, memory, custom rules) |
 | LLM-assisted RCA | Send error context + diff to Gemini/OpenAI for natural language explanation |
 | SSE (Server-Sent Events) | Real-time dashboard updates — replace polling. Deferred: non-trivial with Next.js App Router + RSC. |
 | React Native mobile app | Push alerts, quick rollback from mobile |
@@ -867,7 +1002,7 @@ The integration lead owns the `dev` branch health, reviews all PRs for their ver
 
 ## 17. Summary
 
-> **CI/CD Sentinel** is a self-hosted, Neo4j-powered intelligent deployment observability platform for engineering teams who care about deployment reliability without enterprise complexity.
+> **CI-CD_Sentinel** is a self-hosted, Neo4j-powered intelligent deployment observability platform for engineering teams who care about deployment reliability without enterprise complexity.
 
 Built in 4 versions by a 4-person team using a spiral model:
 

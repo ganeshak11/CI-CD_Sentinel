@@ -33,11 +33,18 @@ You own the foundation that everyone else builds on top of. Your work should be 
   - Document each constraint with a comment explaining *why* it exists
 
 - [ ] **Graph Service:** Build `backend/src/services/graphService.ts`
-  - `createService(name, repoUrl, healthEndpoint)` — creates a `:Service` node
+  - `createService(name, repoUrl, healthEndpoint, environment, dependencies, pathFilter?)` — creates a `:Service` node. `pathFilter` is an optional glob pattern for monorepo support (e.g., `services/payment/**`). If empty, service matches all webhooks from the repo.
+  - `findServicesByRepo(repoFullName)` — returns **all** services registered to a repo URL (returns an array — may be 1 for microservice repos or N for monorepos). Returns empty array if repo is not tracked.
   - `createDeployment(data)` — creates a `:Deployment` node with `[:DEPLOYED_TO]` relationship
   - `createCommit(data)` — creates a `:Commit` node with `[:BASED_ON]` relationship
   - `getServiceById(id)` — returns service + latest deployment status
   - `getAllServices()` — returns all services with their current health
+  - `bulkCreateServices(yamlConfig)` — parses `sentinel-services.yml` and creates all `Service` nodes + `DEPENDS_ON` relationships in a single transaction
+
+- [ ] **Bulk Import CLI:** Create `sentinel import --file <path>` command
+  - Parses `sentinel-services.yml` (name, repo, health_url, environment, dependencies per service)
+  - Calls `graphService.bulkCreateServices()` to register all in one Neo4j transaction
+  - Reports: services created, dependencies linked, errors encountered
 
 - [x] **Neo4j Driver:** Verify `backend/src/db/index.ts` driver singleton is stable (connection retries, graceful shutdown)
 
@@ -76,7 +83,10 @@ You are the entry point for all data into Sentinel. Every deployment the team wi
 - [ ] **Webhook Service:** Create `backend/src/services/webhookService.ts`
   - Handle the `workflow_run` event from GitHub Actions
   - Extract: `workflow_run_id`, `repo`, `commit_sha`, `branch`, `status` (`in_progress`, `completed`), `conclusion` (`success`, `failure`, `cancelled`)
-  - Call `graphService.createDeployment()` to persist the node (idempotent — use `MERGE` not `CREATE`)
+  - Call `graphService.findServicesByRepo()` — if returns empty array, skip processing (unregistered repo)
+  - **Microservice path:** If 1 service returned → create deployment for that service
+  - **Monorepo path:** If N services returned → fetch changed files via GitHub API (`GET /repos/{owner}/{repo}/commits/{sha}`), match each service's `path_filter` against changed file paths, create `Deployment` nodes only for services whose paths were touched
+  - Call `graphService.createDeployment()` per matched service (idempotent — use `MERGE` not `CREATE`)
   - Call `graphService.createCommit()` to link the commit
 
 - [ ] **Controller:** Create `backend/src/controllers/webhookController.ts`
@@ -89,6 +99,7 @@ You are the entry point for all data into Sentinel. Every deployment the team wi
 - Send a simulated `workflow_run` payload using `curl` or Postman — it must be saved to Neo4j
 - A duplicate payload (same `workflow_run_id`) must NOT create a duplicate node (idempotency)
 - An invalid HMAC signature must return `401 Unauthorized`
+- A webhook from an **unregistered repo** must return `200 OK` and create NO nodes (Sentinel skips repos not in the Service Registry)
 - Check the Neo4j browser at `http://localhost:7474` and see your `Deployment` and `Commit` nodes
 
 ---
@@ -155,7 +166,12 @@ You own everything the user sees. By end of V1, the team should be able to open 
   - Status badge: 🟡 In Progress, 🟢 Success, 🔴 Failure, ⚫ Cancelled
   - Click a row → navigate to `/deployments/:id` (detail page, can be a stub for V1)
 
-- [ ] **Basic Navigation:** Sidebar or top nav with links to: Dashboard, Deployments
+- [ ] **Basic Navigation:** Sidebar or top nav with links to: Dashboard, Deployments, Services
+
+- [ ] **Service Registration Page** (`frontend/app/services/new/page.tsx`)
+  - Form fields: Service Name, Repository URL, Path Filter (optional glob for monorepos, e.g., `services/payment/**`), Health Endpoint URL, Environment (dropdown), Dependencies (multi-select of existing services), Rollback Strategy (radio: rerun / workflow_dispatch)
+  - On submit → `POST /api/services`
+  - After success → redirect to "Setup Webhook" page showing the exact webhook URL and secret to copy into GitHub
 
 - [ ] **Loading & Error States:** Every data-fetching component must handle loading spinners and error messages (don't show blank screens)
 
