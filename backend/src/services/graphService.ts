@@ -8,10 +8,11 @@
  *  - MERGE is always used instead of CREATE to guarantee idempotency.
  *  - All node IDs use uuid v4 (except Commit which uses SHA as the natural key).
  *  - Relationships are always created with MERGE to avoid duplicates.
+ *  - Repo identifiers use org/repo format (GitHub's repository.full_name).
  */
 
 import { v4 as uuidv4 } from 'uuid';
-import { executeQuery } from '../db/index';
+import { driver, executeQuery } from '../db/index';
 import {
   Service,
   CreateServiceInput,
@@ -23,6 +24,8 @@ import {
   HealthStatus,
   ServiceWithHealth,
   DeploymentWithCommit,
+  BulkServiceConfig,
+  BulkImportResult,
 } from '../types/deployment.types';
 
 // ─── Service Queries ──────────────────────────────────────────────────────────
@@ -30,24 +33,38 @@ import {
 /**
  * Create or retrieve a :Service node.
  * Uses MERGE on `name` to prevent duplicate registrations.
+ *
+ * After the node is created/updated, DEPENDS_ON relationships are
+ * established for each dependency name (if any).
+ *
+ * @param input.repoUrl — must be in org/repo format (e.g. "ganeshak11/CI-CD_Sentinel")
+ * @param input.pathFilter — optional glob for monorepo scoping (e.g. "services/payment/**")
+ * @param input.dependencies — optional list of other service names this depends on
+ * @param input.rollbackStrategy — "rerun" (default) or "workflow_dispatch"
  */
 export async function createService(input: CreateServiceInput): Promise<Service> {
   const id = uuidv4();
   const now = new Date().toISOString();
   const environment = input.environment ?? 'production';
+  const pathFilter = input.pathFilter ?? '';
+  const rollbackStrategy = input.rollbackStrategy ?? 'rerun';
 
   const query = `
     MERGE (s:Service { name: $name })
     ON CREATE SET
-      s.id              = $id,
-      s.repoUrl         = $repoUrl,
-      s.healthEndpoint  = $healthEndpoint,
-      s.environment     = $environment,
-      s.createdAt       = $createdAt
+      s.id               = $id,
+      s.repoUrl          = $repoUrl,
+      s.healthEndpoint   = $healthEndpoint,
+      s.environment      = $environment,
+      s.pathFilter       = $pathFilter,
+      s.rollbackStrategy = $rollbackStrategy,
+      s.createdAt        = $createdAt
     ON MATCH SET
-      s.repoUrl         = $repoUrl,
-      s.healthEndpoint  = $healthEndpoint,
-      s.environment     = $environment
+      s.repoUrl          = $repoUrl,
+      s.healthEndpoint   = $healthEndpoint,
+      s.environment      = $environment,
+      s.pathFilter       = $pathFilter,
+      s.rollbackStrategy = $rollbackStrategy
     RETURN s
   `;
 
@@ -57,10 +74,48 @@ export async function createService(input: CreateServiceInput): Promise<Service>
     repoUrl: input.repoUrl,
     healthEndpoint: input.healthEndpoint,
     environment,
+    pathFilter,
+    rollbackStrategy,
     createdAt: now,
   });
 
-  return result.records[0].get('s').properties as Service;
+  const service = result.records[0].get('s').properties as Service;
+
+  // Create DEPENDS_ON relationships if dependencies are specified
+  if (input.dependencies && input.dependencies.length > 0) {
+    for (const depName of input.dependencies) {
+      await executeQuery(
+        `
+        MATCH (s:Service { name: $name })
+        MATCH (dep:Service { name: $depName })
+        MERGE (s)-[:DEPENDS_ON]->(dep)
+        `,
+        { name: input.name, depName }
+      );
+    }
+  }
+
+  return service;
+}
+
+/**
+ * Find all :Service nodes registered to a given repo.
+ *
+ * This is the primary lookup used by the webhook processor:
+ * - Returns an array (may be 1 for microservice repos, N for monorepos)
+ * - Returns empty array if the repo is not tracked (webhook is silently skipped)
+ *
+ * @param repoFullName — GitHub repository.full_name (org/repo format, e.g. "ganeshak11/CI-CD_Sentinel")
+ */
+export async function findServicesByRepo(repoFullName: string): Promise<Service[]> {
+  const query = `
+    MATCH (s:Service { repoUrl: $repoFullName })
+    RETURN s
+    ORDER BY s.name ASC
+  `;
+
+  const result = await executeQuery(query, { repoFullName });
+  return result.records.map((row) => row.get('s').properties as Service);
 }
 
 /**
@@ -110,6 +165,129 @@ export async function getAllServices(): Promise<ServiceWithHealth[]> {
     latestDeployment: row.get('latestDeployment')?.properties ?? null,
     latestHealth: row.get('latestHealth')?.properties ?? null,
   }));
+}
+
+/**
+ * Bulk-create services from a parsed YAML config.
+ *
+ * Runs in a SINGLE Neo4j transaction to ensure atomicity:
+ *  1. Pass 1 — MERGE all Service nodes
+ *  2. Pass 2 — MERGE all DEPENDS_ON relationships
+ *
+ * @param services — parsed array from sentinel-services.yml
+ * @returns BulkImportResult with counts and errors
+ */
+export async function bulkCreateServices(
+  services: BulkServiceConfig[]
+): Promise<BulkImportResult> {
+  const result: BulkImportResult = {
+    created: 0,
+    updated: 0,
+    dependenciesLinked: 0,
+    errors: [],
+  };
+
+  const session = driver.session();
+  const txc = session.beginTransaction();
+
+  try {
+    // ── Pass 1: Create/update all Service nodes ──────────────────────────────
+    for (const svc of services) {
+      try {
+        const id = uuidv4();
+        const now = new Date().toISOString();
+
+        const res = await txc.run(
+          `
+          MERGE (s:Service { name: $name })
+          ON CREATE SET
+            s.id               = $id,
+            s.repoUrl          = $repoUrl,
+            s.healthEndpoint   = $healthEndpoint,
+            s.environment      = $environment,
+            s.pathFilter       = $pathFilter,
+            s.rollbackStrategy = $rollbackStrategy,
+            s.createdAt        = $createdAt
+          ON MATCH SET
+            s.repoUrl          = $repoUrl,
+            s.healthEndpoint   = $healthEndpoint,
+            s.environment      = $environment,
+            s.pathFilter       = $pathFilter,
+            s.rollbackStrategy = $rollbackStrategy
+          RETURN s, s.createdAt = $createdAt AS isNew
+          `,
+          {
+            id,
+            name: svc.name,
+            repoUrl: svc.repo,
+            healthEndpoint: svc.health_url,
+            environment: svc.environment ?? 'production',
+            pathFilter: svc.path_filter ?? '',
+            rollbackStrategy: svc.rollback_strategy ?? 'rerun',
+            createdAt: now,
+          }
+        );
+
+        const isNew = res.records[0].get('isNew');
+        if (isNew) {
+          result.created++;
+        } else {
+          result.updated++;
+        }
+      } catch (err: any) {
+        result.errors.push({ service: svc.name, error: err.message });
+      }
+    }
+
+    // ── Pass 2: Create DEPENDS_ON relationships ──────────────────────────────
+    for (const svc of services) {
+      if (!svc.dependencies || svc.dependencies.length === 0) continue;
+
+      for (const depName of svc.dependencies) {
+        try {
+          await txc.run(
+            `
+            MATCH (s:Service { name: $name })
+            MATCH (dep:Service { name: $depName })
+            MERGE (s)-[:DEPENDS_ON]->(dep)
+            `,
+            { name: svc.name, depName }
+          );
+          result.dependenciesLinked++;
+        } catch (err: any) {
+          result.errors.push({
+            service: svc.name,
+            error: `Failed to link dependency ${depName}: ${err.message}`,
+          });
+        }
+      }
+    }
+
+    await txc.commit();
+  } catch (err) {
+    await txc.rollback();
+    throw err;
+  } finally {
+    await session.close();
+  }
+
+  return result;
+}
+
+/**
+ * Delete a :Service node and all its relationships.
+ * Useful for cleanup and testing.
+ */
+export async function deleteService(id: string): Promise<boolean> {
+  const query = `
+    MATCH (s:Service { id: $id })
+    DETACH DELETE s
+    RETURN count(s) AS deleted
+  `;
+
+  const result = await executeQuery(query, { id });
+  const deleted = result.records[0]?.get('deleted')?.toNumber?.() ?? 0;
+  return deleted > 0;
 }
 
 // ─── Deployment Queries ───────────────────────────────────────────────────────
