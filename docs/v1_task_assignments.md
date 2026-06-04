@@ -32,7 +32,7 @@ You own the foundation that everyone else builds on top of. Your work should be 
   - Indexes: `Deployment.status`, `Deployment.created_at`, `HealthCheck.timestamp`
   - Document each constraint with a comment explaining *why* it exists
 
-- [ ] **Graph Service:** Build `backend/src/services/graphService.ts`
+- [x] **Graph Service:** Build `backend/src/services/graphService.ts`
   - `createService(name, repoUrl, healthEndpoint, environment, dependencies, pathFilter?)` — creates a `:Service` node. `pathFilter` is an optional glob pattern for monorepo support (e.g., `services/payment/**`). If empty, service matches all webhooks from the repo.
   - `findServicesByRepo(repoFullName)` — returns **all** services registered to a repo URL (returns an array — may be 1 for microservice repos or N for monorepos). Returns empty array if repo is not tracked.
   - `createDeployment(data)` — creates a `:Deployment` node with `[:DEPLOYED_TO]` relationship
@@ -41,7 +41,7 @@ You own the foundation that everyone else builds on top of. Your work should be 
   - `getAllServices()` — returns all services with their current health
   - `bulkCreateServices(yamlConfig)` — parses `sentinel-services.yml` and creates all `Service` nodes + `DEPENDS_ON` relationships in a single transaction
 
-- [ ] **Bulk Import CLI:** Create `sentinel import --file <path>` command
+- [x] **Bulk Import CLI:** Create `sentinel import --file <path>` command
   - Parses `sentinel-services.yml` (name, repo, health_url, environment, dependencies per service)
   - Calls `graphService.bulkCreateServices()` to register all in one Neo4j transaction
   - Reports: services created, dependencies linked, errors encountered
@@ -50,7 +50,7 @@ You own the foundation that everyone else builds on top of. Your work should be 
 
 - [x] **Environment Config:** Confirm `backend/.env.example` has every variable needed for V1, update if needed
 
-- [ ] **Integration Reviews:** Review all PRs from Chinmay, Varsha, and Abdul before merging to `dev`
+- [x] **Integration Reviews:** Review all PRs from Chinmay, Varsha, and Abdul before merging to `dev`
 
 ### Pre-requisites also completed ✅
 - [x] **CI Pipeline** (`ci.yml`) — runs on every PR to `dev` and `main`
@@ -185,8 +185,8 @@ You own everything the user sees. By end of V1, the team should be able to open 
 
 ## Shared / Everyone
 
-- [ ] **Git Setup:** Clone the repo, checkout `dev`, verify `docker compose up -d` works on your machine — **do this before Monday**
-- [ ] **Research Report:** Submit a 3–4 page written summary of your holiday research (CI/CD concepts, pipelines, why they fail) — share in the group chat before Monday's kickoff
+- [x] **Git Setup:** Clone the repo, checkout `dev`, verify `docker compose up -d` works on your machine — **do this before Monday**
+- [x] **Research Report:** Submit a 3–4 page written summary of your holiday research (CI/CD concepts, pipelines, why they fail) — share in the group chat before Monday's kickoff
 
 ---
 

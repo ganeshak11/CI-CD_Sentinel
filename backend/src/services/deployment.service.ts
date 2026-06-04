@@ -10,4 +10,5 @@ export {
   getDeploymentById,
   getDeployments,
   createCommit,
+  findServicesByRepo,
 } from './graphService';

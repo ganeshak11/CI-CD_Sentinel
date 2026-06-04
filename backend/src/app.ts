@@ -15,10 +15,11 @@ import dotenv from 'dotenv';
 import { driver } from './db/index';
 import { applySchema } from './db/applySchema';
 
-// Route imports (empty stubs — to be implemented by teammates)
+// Route imports
 import deploymentRoutes from './routes/deployment.routes';
 import healthRoutes from './routes/health.routes';
 import webhookRoutes from './routes/webhook.routes';
+import serviceRoutes from './routes/service.routes';
 
 dotenv.config();
 
@@ -53,6 +54,7 @@ app.get('/ping', (_req, res) => {
 });
 
 // ─── API Routes ───────────────────────────────────────────────────────────────
+app.use('/api/services', serviceRoutes);
 app.use('/api/deployments', deploymentRoutes);
 app.use('/api/health-status', healthRoutes);
 app.use('/webhooks', webhookRoutes);
