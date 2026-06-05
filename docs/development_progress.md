@@ -11,8 +11,8 @@ Status Keys: ⚪ Not Started | 🟡 In Progress | 🟢 Completed
 | Feature | Assignee | Status | Notes |
 |---|---|---|---|
 | Phase 1 Infra (Docker/Neo4j/Redis) | Ganesh | 🟢 Completed | Compose file finalized. Schema created. |
-| Webhook Ingest API | Chinmay | ⚪ Not Started | |
-| Deployment & Commit Graph Nodes | Chinmay | ⚪ Not Started | |
+| Webhook Ingest API | Chinmay | 🟢 Completed | |
+| Deployment & Commit Graph Nodes | Chinmay | 🟢 Completed | |
 | 60s Health Worker | Abdul | ⚪ Not Started | |
 | HealthCheck Graph Nodes + Redis Cache | Varsha | ⚪ Not Started | |
 | Next.js Dashboard Shell | Varsha | ⚪ Not Started | |
