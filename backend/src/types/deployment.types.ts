@@ -1,21 +1,47 @@
 // ─── Service ────────────────────────────────────────────────────────────────
 
+export type RollbackStrategy = 'rerun' | 'workflow_dispatch';
+
 export interface Service {
   id: string;
   name: string;
-  repoUrl: string;
+  repoUrl: string;           // org/repo format (matches GitHub repository.full_name)
   healthEndpoint: string;
-  environment: string; // e.g. "production" | "staging"
-  createdAt: string;   // ISO timestamp
-  pathFilter?: string; // Optional glob pattern for monorepos
+  environment: string;        // e.g. "production" | "staging"
+  pathFilter: string;         // glob pattern for monorepo support, empty string = match all
+  rollbackStrategy: RollbackStrategy;
+  createdAt: string;          // ISO timestamp
 }
 
 export interface CreateServiceInput {
   name: string;
-  repoUrl: string;
+  repoUrl: string;            // org/repo format (e.g. "ganeshak11/CI-CD_Sentinel")
   healthEndpoint: string;
   environment?: string;
-  pathFilter?: string;
+  pathFilter?: string;        // optional glob for monorepos (e.g. "services/payment/**")
+  dependencies?: string[];    // names of other services this depends on → creates DEPENDS_ON edges
+  rollbackStrategy?: RollbackStrategy;
+}
+
+// ─── Bulk Import ─────────────────────────────────────────────────────────────
+
+/** Shape of a single service entry in sentinel-services.yml */
+export interface BulkServiceConfig {
+  name: string;
+  repo: string;               // org/repo format
+  health_url: string;
+  environment?: string;
+  path_filter?: string;
+  dependencies?: string[];
+  rollback_strategy?: RollbackStrategy;
+}
+
+/** Result returned by bulkCreateServices() */
+export interface BulkImportResult {
+  created: number;
+  updated: number;
+  dependenciesLinked: number;
+  errors: Array<{ service: string; error: string }>;
 }
 
 // ─── Deployment ──────────────────────────────────────────────────────────────
