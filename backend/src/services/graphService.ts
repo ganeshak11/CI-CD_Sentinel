@@ -43,11 +43,13 @@ export async function createService(input: CreateServiceInput): Promise<Service>
       s.repoUrl         = $repoUrl,
       s.healthEndpoint  = $healthEndpoint,
       s.environment     = $environment,
-      s.createdAt       = $createdAt
+      s.createdAt       = $createdAt,
+      s.pathFilter      = $pathFilter
     ON MATCH SET
       s.repoUrl         = $repoUrl,
       s.healthEndpoint  = $healthEndpoint,
-      s.environment     = $environment
+      s.environment     = $environment,
+      s.pathFilter      = $pathFilter
     RETURN s
   `;
 
@@ -58,6 +60,7 @@ export async function createService(input: CreateServiceInput): Promise<Service>
     healthEndpoint: input.healthEndpoint,
     environment,
     createdAt: now,
+    pathFilter: input.pathFilter ?? null,
   });
 
   return result.records[0].get('s').properties as Service;
@@ -110,6 +113,21 @@ export async function getAllServices(): Promise<ServiceWithHealth[]> {
     latestDeployment: row.get('latestDeployment')?.properties ?? null,
     latestHealth: row.get('latestHealth')?.properties ?? null,
   }));
+}
+
+/**
+ * Find all services registered to a repository URL path.
+ * Returns an array of services whose repoUrl ends with the repository's full name.
+ */
+export async function findServicesByRepo(repoFullName: string): Promise<Service[]> {
+  const query = `
+    MATCH (s:Service)
+    WHERE s.repoUrl ENDS WITH $repoFullName
+    RETURN s
+  `;
+
+  const result = await executeQuery(query, { repoFullName });
+  return result.records.map((row) => row.get('s').properties as Service);
 }
 
 // ─── Deployment Queries ───────────────────────────────────────────────────────

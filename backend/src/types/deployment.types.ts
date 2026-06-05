@@ -7,6 +7,7 @@ export interface Service {
   healthEndpoint: string;
   environment: string; // e.g. "production" | "staging"
   createdAt: string;   // ISO timestamp
+  pathFilter?: string; // Optional glob pattern for monorepos
 }
 
 export interface CreateServiceInput {
@@ -14,6 +15,7 @@ export interface CreateServiceInput {
   repoUrl: string;
   healthEndpoint: string;
   environment?: string;
+  pathFilter?: string;
 }
 
 // ─── Deployment ──────────────────────────────────────────────────────────────

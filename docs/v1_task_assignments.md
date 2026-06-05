@@ -76,11 +76,11 @@ You are the entry point for all data into Sentinel. Every deployment the team wi
 
 ### Tasks
 
-- [ ] **Webhook Route:** Create `backend/src/routes/webhookRoutes.ts`
+- [x] **Webhook Route:** Create `backend/src/routes/webhookRoutes.ts`
   - `POST /webhooks/github` — entry point for GitHub Actions events
   - Validate the HMAC-SHA256 signature using `GITHUB_WEBHOOK_SECRET` (reject invalid requests with 401)
 
-- [ ] **Webhook Service:** Create `backend/src/services/webhookService.ts`
+- [x] **Webhook Service:** Create `backend/src/services/webhookService.ts`
   - Handle the `workflow_run` event from GitHub Actions
   - Extract: `workflow_run_id`, `repo`, `commit_sha`, `branch`, `status` (`in_progress`, `completed`), `conclusion` (`success`, `failure`, `cancelled`)
   - Call `graphService.findServicesByRepo()` — if returns empty array, skip processing (unregistered repo)
@@ -89,11 +89,11 @@ You are the entry point for all data into Sentinel. Every deployment the team wi
   - Call `graphService.createDeployment()` per matched service (idempotent — use `MERGE` not `CREATE`)
   - Call `graphService.createCommit()` to link the commit
 
-- [ ] **Controller:** Create `backend/src/controllers/webhookController.ts`
+- [x] **Controller:** Create `backend/src/controllers/webhookController.ts`
   - Parse the raw body (needed for HMAC validation — `express.raw()` before `express.json()`)
   - Route to the correct handler based on `X-GitHub-Event` header
 
-- [ ] **Register in App:** Wire the webhook route into `backend/src/app.ts`
+- [x] **Register in App:** Wire the webhook route into `backend/src/app.ts`
 
 ### Acceptance Criteria
 - Send a simulated `workflow_run` payload using `curl` or Postman — it must be saved to Neo4j

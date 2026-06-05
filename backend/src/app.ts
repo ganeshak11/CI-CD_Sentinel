@@ -18,7 +18,7 @@ import { applySchema } from './db/applySchema';
 // Route imports (empty stubs — to be implemented by teammates)
 import deploymentRoutes from './routes/deployment.routes';
 import healthRoutes from './routes/health.routes';
-import webhookRoutes from './routes/webhook.routes';
+import webhookRoutes from './routes/webhookRoutes';
 
 dotenv.config();
 
@@ -42,8 +42,13 @@ app.use(
 // Request logging
 app.use(morgan('dev'));
 
-// Raw body MUST be parsed before json() for webhook HMAC validation
-// Chinmay: express.raw() is applied per-route in webhookRoutes, not globally
+// ─── Webhook route MUST be mounted BEFORE express.json() ──────────────────────
+// express.raw() is applied per-route in webhookRoutes. If express.json() runs
+// first (as global middleware), it consumes the body stream and sets req.body
+// to a parsed object — destroying the raw Buffer needed for HMAC-SHA256 validation.
+app.use('/webhooks', webhookRoutes);
+
+// JSON body parser — for all other routes (API, health, etc.)
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -55,7 +60,6 @@ app.get('/ping', (_req, res) => {
 // ─── API Routes ───────────────────────────────────────────────────────────────
 app.use('/api/deployments', deploymentRoutes);
 app.use('/api/health-status', healthRoutes);
-app.use('/webhooks', webhookRoutes);
 
 // ─── 404 handler ─────────────────────────────────────────────────────────────
 app.use((_req, res) => {
