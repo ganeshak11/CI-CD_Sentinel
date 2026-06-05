@@ -77,7 +77,6 @@ export async function createService(input: CreateServiceInput): Promise<Service>
     pathFilter,
     rollbackStrategy,
     createdAt: now,
-    pathFilter: input.pathFilter ?? null,
   });
 
   const service = result.records[0].get('s').properties as Service;

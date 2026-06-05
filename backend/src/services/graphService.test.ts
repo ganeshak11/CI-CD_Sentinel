@@ -8,10 +8,10 @@ import {
   getAllServices,
   bulkCreateServices,
   deleteService,
-} from '../graphService';
-import { driver, executeQuery } from '../../db/index';
+} from './graphService';
+import { driver, executeQuery } from '../db/index';
 
-jest.mock('../../db/index', () => ({
+jest.mock('../db/index', () => ({
   driver: {
     session: jest.fn(),
     verifyConnectivity: jest.fn(),
