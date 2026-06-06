@@ -20,6 +20,7 @@ import deploymentRoutes from './routes/deployment.routes';
 import healthRoutes from './routes/health.routes';
 import webhookRoutes from './routes/webhookRoutes';
 import serviceRoutes from './routes/service.routes';
+import { startHealthWorker } from './services/healthWorker';
 
 dotenv.config();
 
@@ -93,7 +94,10 @@ async function start() {
     await applySchema();
     console.log('[Neo4j] Schema applied');
 
-    // 3. Start Express server
+    // 3. Start the health worker before the server starts accepting requests
+    startHealthWorker();
+
+    // 4. Start Express server
     app.listen(PORT, () => {
       console.log(`[Server] Sentinel backend running on http://localhost:${PORT}`);
       console.log(`[Server] Webhook endpoint: POST http://localhost:${PORT}/webhooks/github`);

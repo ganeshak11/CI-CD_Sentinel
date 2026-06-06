@@ -11,6 +11,7 @@
 
 import { Router } from 'express';
 import { getAllServices, getHealthHistory } from '../services/graphService';
+import { getHealthCache } from '../services/redisClient';
 
 const router = Router();
 
@@ -18,7 +19,29 @@ const router = Router();
 router.get('/', async (_req, res) => {
   try {
     const services = await getAllServices();
-    res.json({ data: services });
+    const servicesWithCache = await Promise.all(
+      services.map(async (service) => {
+        const cache = await getHealthCache(service.id);
+        if (!cache) {
+          return service;
+        }
+
+        return {
+          ...service,
+          latestHealth: {
+            id: service.latestHealth?.id ?? '',
+            serviceId: service.id,
+            status: cache.status,
+            statusCode: cache.statusCode,
+            responseTimeMs: cache.responseTimeMs,
+            error: cache.error,
+            checkedAt: cache.checkedAt,
+          },
+        };
+      })
+    );
+
+    res.json({ data: servicesWithCache });
   } catch (err) {
     console.error('[health.routes] GET /health-status error:', err);
     res.status(500).json({ error: 'Failed to fetch health status' });

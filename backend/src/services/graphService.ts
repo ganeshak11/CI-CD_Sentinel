@@ -466,6 +466,10 @@ export async function createHealthCheck(
 
   const query = `
     MATCH (s:Service { id: $serviceId })
+    OPTIONAL MATCH (d:Deployment)-[:DEPLOYED_TO]->(s)
+    WITH s, d
+    ORDER BY d.startedAt DESC
+    LIMIT 1
     CREATE (h:HealthCheck {
       id:             $id,
       serviceId:      $serviceId,
@@ -476,6 +480,9 @@ export async function createHealthCheck(
       checkedAt:      $checkedAt
     })
     MERGE (s)-[:HAS_HEALTH]->(h)
+    FOREACH (_ IN CASE WHEN d IS NULL THEN [] ELSE [1] END |
+      MERGE (d)-[:HAS_HEALTH]->(h)
+    )
     RETURN h
   `;
 
