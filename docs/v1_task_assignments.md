@@ -113,7 +113,7 @@ You determine whether a deployed service is actually alive. Your worker is the h
 
 ### Tasks
 
-- [ ] **Health Worker:** Create `backend/src/services/healthWorker.ts`
+- [x] **Health Worker:** Create `backend/src/services/healthWorker.ts`
   - Use `node-cron` to poll every **60 seconds**
   - For each `:Service` node (fetched from Neo4j via `graphService.getAllServices()`):
     - HTTP GET the service's `healthEndpoint` with a 5-second timeout
@@ -121,15 +121,15 @@ You determine whether a deployed service is actually alive. Your worker is the h
     - If timeout or non-2xx → create a `:HealthCheck { status: 'unhealthy', error: '...' }` node
     - Link with `[:HAS_HEALTH]` relationship from the latest `Deployment` node
 
-- [ ] **Redis Caching:** Cache the latest health status per service in Redis
+- [x] **Redis Caching:** Cache the latest health status per service in Redis
   - Key: `health:serviceId`, Value: `{ status, timestamp }`
   - TTL: 90 seconds (so stale data auto-expires if the worker stops)
 
-- [ ] **Health API Route:** Create `GET /api/health-status` endpoint
+- [x] **Health API Route:** Create `GET /api/health-status` endpoint
   - Returns all services with their latest health (read from Redis first, Neo4j as fallback)
   - Returns `GET /api/health-status/:serviceId` for per-service history (last 10 checks from Neo4j)
 
-- [ ] **Start Worker:** Start the cron job in `backend/src/app.ts` on server boot
+- [x] **Start Worker:** Start the cron job in `backend/src/app.ts` on server boot
 
 ### Acceptance Criteria
 - Worker starts automatically when the backend boots
