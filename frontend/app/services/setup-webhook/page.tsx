@@ -1,4 +1,16 @@
+"use client";
+
+import { useEffect, useState } from "react";
+
 export default function SetupWebhook() {
+  const [webhookUrl, setWebhookUrl] = useState("http://localhost:3001/webhooks/github");
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setWebhookUrl(`${window.location.origin}/webhooks/github`);
+    }
+  }, []);
+
   return (
     <div className="p-6">
       <h1 className="text-2xl font-bold">
@@ -10,7 +22,7 @@ export default function SetupWebhook() {
       </p>
 
       <code>
-        http://localhost:3001/webhooks/github
+        {webhookUrl}
       </code>
 
       <p className="mt-4">

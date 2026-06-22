@@ -1,3 +1,5 @@
+import { Service } from "@/types/service";
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 export async function getServices() {
@@ -36,7 +38,7 @@ export async function getHealthStatus() {
   return response.json();
 }
 
-export async function createService(data: any) {
+export async function createService(data: Omit<Service, "id">) {
   const response = await fetch(
     `${API_URL}/api/services`,
     {

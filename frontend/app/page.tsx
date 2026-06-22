@@ -6,10 +6,12 @@ import {
   getServices,
   getHealthStatus,
 } from "@/services/api";
+import { Service } from "@/types/service";
+import { HealthStatus } from "@/types/health";
 
 export default function Dashboard() {
-  const [services, setServices] = useState([]);
-  const [health, setHealth] = useState([]);
+  const [services, setServices] = useState<Service[]>([]);
+  const [health, setHealth] = useState<HealthStatus[]>([]);
   const [loading, setLoading] = useState(true);
 
   async function loadData() {
@@ -50,9 +52,9 @@ export default function Dashboard() {
         </h1>
 
         <div className="grid md:grid-cols-3 gap-4">
-          {services.map((service: any) => {
+          {services.map((service: Service) => {
             const status = health.find(
-              (h: any) => h.serviceId === service.id
+              (h: HealthStatus) => h.serviceId === service.id
             );
 
             return (
