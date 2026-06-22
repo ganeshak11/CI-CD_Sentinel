@@ -18,13 +18,13 @@ This checklist tracks the entire lifecycle of the CI-CD_Sentinel project from a 
 ## 2. Development Workflow (The Spiral Model)
 *How features are built and merged during each version (V1, V2, etc.).*
 
-- [ ] **Branching:** Ensure all team members create branches from `dev` (e.g., `feature/webhook-ingest`).
-- [ ] **Draft PRs:** Encourage opening PRs early as drafts so you (the integration lead) can monitor architecture direction.
-- [ ] **Integration Review:** You review PRs against `dev` for:
+- [x] **Branching:** Ensure all team members create branches from `dev` (e.g., `feature/webhook-ingest`).
+- [x] **Draft PRs:** Encourage opening PRs early as drafts so you (the integration lead) can monitor architecture direction.
+- [x] **Integration Review:** You review PRs against `dev` for:
     - Database safety (e.g., missing Neo4j indexes, unoptimized Cypher queries).
     - API contracts (does the frontend expect what the backend sends?).
-- [ ] **Merge to Dev:** Squash and merge feature branches into `dev` when approved.
-- [ ] **Version Stabilization:** Once all V1 features are in `dev`, run end-to-end local tests. Fix any integration bugs directly on `dev`.
+- [x] **Merge to Dev:** Squash and merge feature branches into `dev` when approved.
+- [x] **Version Stabilization:** Once all V1 features are in `dev`, run end-to-end local tests. Fix any integration bugs directly on `dev`.
 
 ---
 

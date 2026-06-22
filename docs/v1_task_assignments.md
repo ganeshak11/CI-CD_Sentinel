@@ -148,32 +148,32 @@ You own everything the user sees. By end of V1, the team should be able to open 
 
 ### Tasks
 
-- [ ] **Next.js Project Setup:** Confirm the Next.js 14 (App Router) project in `frontend/` runs cleanly
+- [x] **Next.js Project Setup:** Confirm the Next.js 14 (App Router) project in `frontend/` runs cleanly
   - `npm install` → `npm run dev` → visible at `http://localhost:3000`
   - Configure `frontend/.env.local` with `NEXT_PUBLIC_API_URL=http://localhost:3001`
 
-- [ ] **API Client:** Create `frontend/services/api.ts`
+- [x] **API Client:** Create `frontend/services/api.ts`
   - `getServices()` → `GET /api/services`
   - `getDeployments(serviceId?)` → `GET /api/deployments`
   - `getHealthStatus()` → `GET /api/health-status`
 
-- [ ] **Main Dashboard Page** (`frontend/app/page.tsx`)
+- [x] **Main Dashboard Page** (`frontend/app/page.tsx`)
   - Services cards showing: name, repo URL, current health status (🟢 / 🔴), last deployment time
   - Auto-refresh every 30 seconds (use `setInterval` or React Query's `refetchInterval`)
 
-- [ ] **Deployments List Page** (`frontend/app/deployments/page.tsx`)
+- [x] **Deployments List Page** (`frontend/app/deployments/page.tsx`)
   - Table with columns: Deployment ID, Branch, Commit SHA, Status, Started At, Duration
   - Status badge: 🟡 In Progress, 🟢 Success, 🔴 Failure, ⚫ Cancelled
   - Click a row → navigate to `/deployments/:id` (detail page, can be a stub for V1)
 
-- [ ] **Basic Navigation:** Sidebar or top nav with links to: Dashboard, Deployments, Services
+- [x] **Basic Navigation:** Sidebar or top nav with links to: Dashboard, Deployments, Services
 
-- [ ] **Service Registration Page** (`frontend/app/services/new/page.tsx`)
+- [x] **Service Registration Page** (`frontend/app/services/new/page.tsx`)
   - Form fields: Service Name, Repository URL, Path Filter (optional glob for monorepos, e.g., `services/payment/**`), Health Endpoint URL, Environment (dropdown), Dependencies (multi-select of existing services), Rollback Strategy (radio: rerun / workflow_dispatch)
   - On submit → `POST /api/services`
   - After success → redirect to "Setup Webhook" page showing the exact webhook URL and secret to copy into GitHub
 
-- [ ] **Loading & Error States:** Every data-fetching component must handle loading spinners and error messages (don't show blank screens)
+- [x] **Loading & Error States:** Every data-fetching component must handle loading spinners and error messages (don't show blank screens)
 
 ### Acceptance Criteria
 - Dashboard is visible at `http://localhost:3000` with no console errors
