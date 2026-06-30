@@ -1,3 +1,5 @@
+import { HealthStatus, LatestDeployment } from './health';
+
 export interface Service {
   id: string;
   name: string;
@@ -5,5 +7,7 @@ export interface Service {
   pathFilter?: string;
   healthEndpoint: string;
   environment: string;
-  lastDeploymentTime?: string;
+  createdAt: string;
+  latestDeployment?: LatestDeployment | null;
+  latestHealth?: HealthStatus | null;
 }

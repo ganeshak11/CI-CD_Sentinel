@@ -11,6 +11,7 @@
  *  - Repo identifiers use org/repo format (GitHub's repository.full_name).
  */
 
+import neo4j from 'neo4j-driver';
 import { v4 as uuidv4 } from 'uuid';
 import { driver, executeQuery } from '../db/index';
 import {
@@ -338,7 +339,7 @@ export async function createDeployment(input: CreateDeploymentInput): Promise<De
 
   const result = await executeQuery(query, {
     id,
-    workflowRunId: input.workflowRunId,
+    workflowRunId: neo4j.int(input.workflowRunId),
     workflowName: input.workflowName,
     branch: input.branch,
     status: input.status,
@@ -391,8 +392,8 @@ export async function getDeployments(
     OPTIONAL MATCH (d)-[:BASED_ON]->(c:Commit)
     RETURN d, c
     ORDER BY d.startedAt DESC
-    SKIP $offset
-    LIMIT $limit
+    SKIP toInteger($offset)
+    LIMIT toInteger($limit)
   `;
 
   const result = await executeQuery(query, {
@@ -440,7 +441,7 @@ export async function createCommit(
     authorEmail: input.authorEmail,
     timestamp: input.timestamp,
     repoUrl: input.repoUrl,
-    workflowRunId,
+    workflowRunId: neo4j.int(workflowRunId),
   });
 
   return result.records[0].get('c').properties as Commit;
@@ -511,7 +512,7 @@ export async function getHealthHistory(
     MATCH (s:Service { id: $serviceId })-[:HAS_HEALTH]->(h:HealthCheck)
     RETURN h
     ORDER BY h.checkedAt DESC
-    LIMIT $limit
+    LIMIT toInteger($limit)
   `;
 
   const result = await executeQuery(query, { serviceId, limit });

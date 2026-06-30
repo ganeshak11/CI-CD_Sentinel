@@ -54,8 +54,13 @@ app.use('/webhooks', webhookRoutes);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// ─── Health Ping (used by Abdul's worker to test the server itself) ───────────
+// ─── Health Ping + Health endpoint ───────────────────────────────────────────
 app.get('/ping', (_req, res) => {
+  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// /health — standard health check endpoint (used by the health worker)
+app.get('/health', (_req, res) => {
   res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 

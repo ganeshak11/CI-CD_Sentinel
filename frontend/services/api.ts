@@ -9,7 +9,8 @@ export async function getServices() {
     throw new Error("Failed to fetch services");
   }
 
-  return response.json();
+  const json = await response.json();
+  return json.data || [];
 }
 
 export async function getDeployments(serviceId?: string) {
@@ -23,7 +24,8 @@ export async function getDeployments(serviceId?: string) {
     throw new Error("Failed to fetch deployments");
   }
 
-  return response.json();
+  const json = await response.json();
+  return json.data || [];
 }
 
 export async function getHealthStatus() {
@@ -35,7 +37,8 @@ export async function getHealthStatus() {
     throw new Error("Failed to fetch health status");
   }
 
-  return response.json();
+  const json = await response.json();
+  return json.data || [];
 }
 
 export async function createService(data: Omit<Service, "id">) {
@@ -51,8 +54,15 @@ export async function createService(data: Omit<Service, "id">) {
   );
 
   if (!response.ok) {
-    throw new Error("Failed to create service");
+    const errorData = await response.json().catch(() => ({}));
+    console.error("Backend validation error:", errorData);
+    throw new Error(
+      errorData.details
+        ? JSON.stringify(errorData.details)
+        : errorData.error || "Failed to create service"
+    );
   }
 
-  return response.json();
+  const json = await response.json();
+  return json.data;
 }

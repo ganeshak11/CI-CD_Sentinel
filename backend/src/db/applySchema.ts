@@ -6,12 +6,16 @@ async function applySchema() {
   const schemaPath = path.join(__dirname, 'schema.cypher');
   const cypher = fs.readFileSync(schemaPath, 'utf8');
 
-  // Split the file by semi-colons to execute each constraint/index command separately.
-  // Lines starting with // are Cypher comments — they are filtered out.
-  const commands = cypher
+  // Strip out lines starting with // first, so block commands aren't filtered out
+  const cleanCypher = cypher
+    .split('\n')
+    .filter(line => !line.trim().startsWith('//'))
+    .join('\n');
+
+  const commands = cleanCypher
     .split(';')
     .map((cmd) => cmd.trim())
-    .filter((cmd) => cmd.length > 0 && !cmd.startsWith('//'));
+    .filter((cmd) => cmd.length > 0);
 
   const session = driver.session();
   try {

@@ -2,39 +2,28 @@
 
 import { useEffect, useState } from "react";
 import Navbar from "../components/Navbar";
-import {
-  getServices,
-  getHealthStatus,
-} from "@/services/api";
+import { getServices } from "@/services/api";
 import { Service } from "@/types/service";
-import { HealthStatus } from "@/types/health";
 
 export default function Dashboard() {
   const [services, setServices] = useState<Service[]>([]);
-  const [health, setHealth] = useState<HealthStatus[]>([]);
   const [loading, setLoading] = useState(true);
 
   async function loadData() {
     try {
       const serviceData = await getServices();
-      const healthData = await getHealthStatus();
-
-      setServices(serviceData);
-      setHealth(healthData);
+      setServices(Array.isArray(serviceData) ? serviceData : []);
     } catch (error) {
-      console.error(error);
+      console.error("Dashboard load error:", error);
+      setServices([]);
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   }
 
   useEffect(() => {
     loadData();
-
-    const interval = setInterval(() => {
-      loadData();
-    }, 30000);
-
+    const interval = setInterval(loadData, 30000);
     return () => clearInterval(interval);
   }, []);
 
@@ -53,9 +42,9 @@ export default function Dashboard() {
 
         <div className="grid md:grid-cols-3 gap-4">
           {services.map((service: Service) => {
-            const status = health.find(
-              (h: HealthStatus) => h.serviceId === service.id
-            );
+            const healthStatus = service.latestHealth?.status;
+            const isHealthy = healthStatus === "healthy";
+            const deployment = service.latestDeployment;
 
             return (
               <div
@@ -69,14 +58,19 @@ export default function Dashboard() {
                 <p>{service.repoUrl}</p>
 
                 <p className="mt-2">
-                  Status:
-                  {status?.healthy ? " 🟢 Healthy" : " 🔴 Down"}
+                  Status:{" "}
+                  {healthStatus
+                    ? isHealthy
+                      ? "🟢 Healthy"
+                      : "🔴 Down"
+                    : "⚪ Unknown"}
                 </p>
 
                 <p>
-                  Last Deployment:
-                  {service.lastDeploymentTime ||
-                    "No Deployments"}
+                  Last Deployment:{" "}
+                  {deployment
+                    ? `${deployment.conclusion ?? deployment.status} on ${deployment.branch} (${new Date(deployment.startedAt).toLocaleString()})`
+                    : "No Deployments"}
                 </p>
               </div>
             );

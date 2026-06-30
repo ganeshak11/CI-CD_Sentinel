@@ -1,4 +1,5 @@
 import React from 'react';
+import './globals.css';
 export const metadata = {
   title: 'CI-CD_Sentinel',
   description: 'Neo4j-powered deployment observability',
