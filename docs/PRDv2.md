@@ -1,6 +1,5 @@
 PRODUCT REQUIREMENTS DOCUMENT (PRD)
 Product Name
-
 CI-CD_Sentinel
 
 Product Category
@@ -526,5 +525,4 @@ suggested fixes generated
 debugging time reduced
 
 13. FINAL ONE-LINE SUMMARY
-
 CI-CD_Sentinel is a phased DevOps reliability system that unifies deployment control, enforces engineering discipline, and assists debugging through structured diagnostics and intelligent insights.

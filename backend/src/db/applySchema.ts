@@ -5,7 +5,6 @@ import path from 'path';
 async function applySchema() {
   const schemaPath = path.join(__dirname, 'schema.cypher');
   const cypher = fs.readFileSync(schemaPath, 'utf8');
-
   // Strip out lines starting with // first, so block commands aren't filtered out
   const cleanCypher = cypher
     .split('\n')

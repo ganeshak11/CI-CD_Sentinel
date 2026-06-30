@@ -8,7 +8,9 @@
 
 > **Deployment graph intelligence + automated recovery + team notification**
 
-CI-CD_Sentinel is a **self-hosted, open-source intelligent deployment observability platform** powered by Neo4j. It is deployed as a **single centralized instance** inside your VPC, connects to GitHub Actions via webhooks (supports Organization-level webhooks for multi-repo setups), and gives your team full visibility into what's deployed, what broke, and how to fix it — automatically.
+
+CI/CD Sentinel is a **self-hosted, open-source intelligent deployment observability platform** powered by Neo4j. It runs alongside your application stack, connects to GitHub Actions via webhooks, and gives your team full visibility into what's deployed, what broke, and how to fix it — automatically.
+
 
 ---
 
@@ -94,6 +96,7 @@ Next.js Dashboard
 ## Architecture
 
 ![CI-CD_Sentinel Architecture](docs/diagrams/architecture.png)
+
 
 **Core data model (nodes + relationships):**
 ```
