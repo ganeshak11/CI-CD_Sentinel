@@ -13,10 +13,10 @@ Status Keys: ⚪ Not Started | 🟡 In Progress | 🟢 Completed
 | Phase 1 Infra (Docker/Neo4j/Redis) | Ganesh | 🟢 Completed | Compose file finalized. Schema created. |
 | Webhook Ingest API | Chinmay | 🟢 Completed | |
 | Deployment & Commit Graph Nodes | Chinmay | 🟢 Completed | |
-| 60s Health Worker | Abdul | ⚪ Not Started | |
-| HealthCheck Graph Nodes + Redis Cache | Varsha | ⚪ Not Started | |
-| Next.js Dashboard Shell | Varsha | ⚪ Not Started | |
-| V1 Integration & E2E Testing | Ganesh | ⚪ Not Started | |
+| 60s Health Worker | Abdul | 🟢 Completed | |
+| HealthCheck Graph Nodes + Redis Cache | Varsha | 🟢 Completed | |
+| Next.js Dashboard Shell | Varsha | 🟢 Completed | |
+| V1 Integration & E2E Testing | Ganesh | 🟢 Completed | |
 
 ---
 
@@ -24,14 +24,14 @@ Status Keys: ⚪ Not Started | 🟡 In Progress | 🟢 Completed
 
 | Feature | Assignee | Status | Notes |
 |---|---|---|---|
-| Automated Rollback Engine (Re-run API) | [TBD] | ⚪ Not Started | |
-| Rollback Graph Relationships | [TBD] | ⚪ Not Started | |
-| LogFetchJob Pipeline (Zip Fetch & Parse) | [TBD] | ⚪ Not Started | |
-| RCA Engine (Regex Rules & Status) | [TBD] | ⚪ Not Started | |
-| RCA Panel UI | [TBD] | ⚪ Not Started | |
-| Deployment Comparison UI | [TBD] | ⚪ Not Started | |
-| Notification Templates (Slack/Email/PR) | [TBD] | ⚪ Not Started | |
-| V2 Integration & E2E Testing | [TBD] | ⚪ Not Started | |
+| Automated Rollback Engine (Re-run API) | Abdul | ⚪ Not Started | Tier 1 auto + Tier 2 manual rollback via GitHub API |
+| Rollback Graph Relationships | Ganesh | ⚪ Not Started | `Rollback` node, `TRIGGERED_ROLLBACK` rel, `getLastHealthyDeployment()` |
+| LogFetchJob Pipeline (Zip Fetch & Parse) | Chinmay | ⚪ Not Started | GitHub Actions log ZIP → extract → last 500 lines in Redis |
+| RCA Engine (Regex Rules & Status) | Chinmay | ⚪ Not Started | 8 error pattern types, confidence scoring, `ErrorPattern` nodes |
+| RCA Panel UI | Varsha | ⚪ Not Started | Deployment detail page — error patterns, log viewer, changed files |
+| Deployment Comparison UI | Varsha | ⚪ Not Started | Rollback console — preview modal, confirm rollback, redeploy button |
+| Notification Templates (Slack/Email/PR) | Abdul | ⚪ Not Started | `@slack/webhook` + `nodemailer`, triggered on failure & rollback |
+| V2 Integration & E2E Testing | Ganesh | ⚪ Not Started | `docs/v2_test_plan.md`, PR reviews, schema migrations |
 
 ---
 

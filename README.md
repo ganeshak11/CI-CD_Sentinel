@@ -45,8 +45,8 @@ The entire deployment lifecycle — services, deployments, commits, files, error
 
 | Version | Tagline | Core Value |
 |---|---|---|
-| **V1 — See Everything** | ✅ In Development | Know what's deployed and if it's healthy |
-| **V2 — Fix Faster** | 🔜 Planned | Know what broke and recover in 60 seconds |
+| **V1 — See Everything** | ✅ Completed | Know what's deployed and if it's healthy |
+| **V2 — Fix Faster** | 🚧 In Progress | Know what broke and recover in 60 seconds |
 | **V3 — Prevent Failures** | 🔜 Planned | Know what's risky before you push |
 | **V4 — Ship at Scale** | 🔜 Planned | Production-ready for teams |
 

@@ -33,7 +33,7 @@ This checklist tracks the entire lifecycle of the CI-CD_Sentinel project from a 
 
 - [ ] **Dockerfiles:** Write optimized, multi-stage Dockerfiles for the Backend (Node) and Frontend (Next.js).
 - [x] **CI Pipeline (Build & Test):** Create a GitHub Action (`.github/workflows/ci.yml`) that runs on every PR to `dev` and `main` to build the Docker images and run tests (ensures the build isn't broken).
-- [ ] **Environment Configuration:** Ensure the production `docker-compose.yml` pulls images from the registry rather than building from local source.
+- [x] **Environment Configuration:** Ensure the production `docker-compose.yml` pulls images from the registry rather than building from local source.
 
 ---
 
