@@ -5,33 +5,47 @@ import path from 'path';
 async function applySchema() {
   const schemaPath = path.join(__dirname, 'schema.cypher');
   const cypher = fs.readFileSync(schemaPath, 'utf8');
+  // Strip out lines starting with // first, so block commands aren't filtered out
+  const cleanCypher = cypher
+    .split('\n')
+    .filter(line => !line.trim().startsWith('//'))
+    .join('\n');
 
-  // Split the file by semi-colons to execute each constraint/index command separately
-  const commands = cypher
+  const commands = cleanCypher
     .split(';')
     .map((cmd) => cmd.trim())
-    .filter((cmd) => cmd.length > 0 && !cmd.startsWith('//'));
+    .filter((cmd) => cmd.length > 0);
 
   const session = driver.session();
   try {
-    console.log(`Starting Neo4j schema application (${commands.length} commands)...`);
+    console.log(`[Schema] Applying ${commands.length} constraints/indexes…`);
     for (const cmd of commands) {
-      console.log(`Executing: ${cmd}`);
+      // Strip inline comments for cleaner log output
+      const label = cmd.split('\n').filter((l) => !l.trim().startsWith('//'))[0]?.trim() ?? cmd;
+      console.log(`[Schema] → ${label}`);
       await session.run(cmd);
     }
-    console.log('Neo4j schema applied successfully.');
+    console.log('[Schema] All constraints and indexes applied successfully.');
   } catch (error) {
-    console.error('Error applying Neo4j schema:', error);
-    process.exit(1);
+    console.error('[Schema] Error applying Neo4j schema:', error);
+    throw error; // Let the caller decide whether to exit
   } finally {
     await session.close();
-    await driver.close();
   }
 }
 
-// Run if called directly via ts-node
+// Run standalone via: npx ts-node src/db/applySchema.ts
 if (require.main === module) {
-  applySchema();
+  applySchema()
+    .then(() => {
+      console.log('[Schema] Done.');
+      return driver.close();
+    })
+    .catch(async (err) => {
+      console.error('[Schema] Fatal:', err);
+      await driver.close();
+      process.exit(1);
+    });
 }
 
 export { applySchema };

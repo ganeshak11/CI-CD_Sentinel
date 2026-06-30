@@ -1,6 +1,6 @@
 # Sentinel Project & Operations Checklist
 
-This checklist tracks the entire lifecycle of the CI/CD Sentinel project from a repository owner's perspective — from local development to open-source distribution.
+This checklist tracks the entire lifecycle of the CI-CD_Sentinel project from a repository owner's perspective — from local development to open-source distribution.
 
 ---
 
@@ -18,13 +18,13 @@ This checklist tracks the entire lifecycle of the CI/CD Sentinel project from a 
 ## 2. Development Workflow (The Spiral Model)
 *How features are built and merged during each version (V1, V2, etc.).*
 
-- [ ] **Branching:** Ensure all team members create branches from `dev` (e.g., `feature/webhook-ingest`).
-- [ ] **Draft PRs:** Encourage opening PRs early as drafts so you (the integration lead) can monitor architecture direction.
-- [ ] **Integration Review:** You review PRs against `dev` for:
+- [x] **Branching:** Ensure all team members create branches from `dev` (e.g., `feature/webhook-ingest`).
+- [x] **Draft PRs:** Encourage opening PRs early as drafts so you (the integration lead) can monitor architecture direction.
+- [x] **Integration Review:** You review PRs against `dev` for:
     - Database safety (e.g., missing Neo4j indexes, unoptimized Cypher queries).
     - API contracts (does the frontend expect what the backend sends?).
-- [ ] **Merge to Dev:** Squash and merge feature branches into `dev` when approved.
-- [ ] **Version Stabilization:** Once all V1 features are in `dev`, run end-to-end local tests. Fix any integration bugs directly on `dev`.
+- [x] **Merge to Dev:** Squash and merge feature branches into `dev` when approved.
+- [x] **Version Stabilization:** Once all V1 features are in `dev`, run end-to-end local tests. Fix any integration bugs directly on `dev`.
 
 ---
 
@@ -32,9 +32,8 @@ This checklist tracks the entire lifecycle of the CI/CD Sentinel project from a 
 *Ensuring the code is ready to be built into production artifacts.*
 
 - [ ] **Dockerfiles:** Write optimized, multi-stage Dockerfiles for the Backend (Node) and Frontend (Next.js).
-- [ ] **CI Pipeline (Build & Test):** Create a GitHub Action (`.github/workflows/ci.yml`) that runs on every PR to `dev` and `main` to build the Docker images and run tests (ensures the build isn't broken).
-- [ ] **Environment Configuration:** Ensure the production `docker-compose.yml` pulls images from the registry rather than building from local source.
-
+- [x] **CI Pipeline (Build & Test):** Create a GitHub Action (`.github/workflows/ci.yml`) that runs on every PR to `dev` and `main` to build the Docker images and run tests (ensures the build isn't broken).
+- [x] **Environment Configuration:** Ensure the production `docker-compose.yml` pulls images from the registry rather than building from local source.
 ---
 
 ## 4. Release & Distribution (The Open-Source Way)
@@ -62,6 +61,16 @@ This checklist tracks the entire lifecycle of the CI/CD Sentinel project from a 
 - [ ] **Extraction Test:** User extracts the archive and copies `.env.example` to `.env`.
 - [ ] **Boot Test:** User runs `docker compose up -d` and the pre-built images pull and start in under 30 seconds.
 - [ ] **First-run Wizard:** The user can access the dashboard, register their first service, and input their GitHub OAuth credentials.
+- [ ] **Service Registration — Single:** Register one service via the UI at `/services/new` (name, repo URL, health URL, environment, dependencies).
+- [ ] **Service Registration — Bulk Import:** Import a `sentinel-services.yml` via `sentinel import --file sentinel-services.yml` and verify all services appear in the dashboard.
+- [ ] **Service Registration — Auto-Discovery (V2+):** Connect GitHub Org via OAuth, see repo list, select services to track.
+- [ ] **Webhook Setup — Per-Repo:** Add Sentinel webhook to a single GitHub repo and verify webhook events arrive.
+- [ ] **Webhook Setup — Org-Level:** Add Sentinel webhook once at GitHub Organization level and verify events from multiple repos are correctly routed to their registered services.
+- [ ] **Health Monitoring Activation:** Confirm health worker starts polling immediately after service registration (before any deployment).
+- [ ] **Unregistered Repo Filtering:** Send a webhook from a repo NOT registered in Sentinel and verify it returns `200 OK` without creating any nodes.
+- [ ] **Monorepo Registration:** Register 2+ services with the same `repo_url` but different `path_filter` globs (e.g., `services/auth/**` and `services/payment/**`).
+- [ ] **Monorepo Webhook Routing:** Push a commit that only changes `services/payment/config.ts` and verify that ONLY `payment-service` gets a new `Deployment` node — `auth-service` must NOT get one.
+- [ ] **Monorepo Full-Repo Change:** Push a commit that changes files across multiple service paths and verify ALL matching services get `Deployment` nodes.
 
 ---
 

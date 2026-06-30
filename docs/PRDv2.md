@@ -1,7 +1,6 @@
 PRODUCT REQUIREMENTS DOCUMENT (PRD)
 Product Name
-
-CI/CD Sentinel
+CI-CD_Sentinel
 
 Product Category
 
@@ -17,7 +16,7 @@ Phased Evolution Architecture
 
 1. Product Vision
 
-CI/CD Sentinel is a unified DevOps reliability system that improves software delivery quality by combining:
+CI-CD_Sentinel is a unified DevOps reliability system that improves software delivery quality by combining:
 
 centralized deployment visibility
 controlled recovery mechanisms
@@ -27,7 +26,7 @@ intelligent debugging assistance
 
 The system acts as a reliability layer across the entire CI/CD lifecycle, reducing operational complexity and preventing common engineering mistakes.
 
-CI/CD Sentinel evolves through 3 maturity levels:
+CI-CD_Sentinel evolves through 3 maturity levels:
 
 V1 → Observability & Control
 V2 → Governance & Prevention
@@ -92,7 +91,7 @@ benefit from structured debugging assistance
 
 5. Product Scope Overview
 
-CI/CD Sentinel evolves across three versions:
+CI-CD_Sentinel evolves across three versions:
 
 version	capability focus
 V1	deployment observability & control
@@ -526,5 +525,4 @@ suggested fixes generated
 debugging time reduced
 
 13. FINAL ONE-LINE SUMMARY
-
-CI/CD Sentinel is a phased DevOps reliability system that unifies deployment control, enforces engineering discipline, and assists debugging through structured diagnostics and intelligent insights.
+CI-CD_Sentinel is a phased DevOps reliability system that unifies deployment control, enforces engineering discipline, and assists debugging through structured diagnostics and intelligent insights.

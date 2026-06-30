@@ -1,4 +1,4 @@
-# CI/CD Sentinel
+# CI-CD_Sentinel
 
 ![Version](https://img.shields.io/badge/version-V1--See%20Everything-blueviolet)
 ![Database](https://img.shields.io/badge/database-Neo4j%20Graph-blue)
@@ -8,7 +8,9 @@
 
 > **Deployment graph intelligence + automated recovery + team notification**
 
+
 CI/CD Sentinel is a **self-hosted, open-source intelligent deployment observability platform** powered by Neo4j. It runs alongside your application stack, connects to GitHub Actions via webhooks, and gives your team full visibility into what's deployed, what broke, and how to fix it — automatically.
+
 
 ---
 
@@ -45,8 +47,8 @@ The entire deployment lifecycle — services, deployments, commits, files, error
 
 | Version | Tagline | Core Value |
 |---|---|---|
-| **V1 — See Everything** | ✅ In Development | Know what's deployed and if it's healthy |
-| **V2 — Fix Faster** | 🔜 Planned | Know what broke and recover in 60 seconds |
+| **V1 — See Everything** | ✅ Completed | Know what's deployed and if it's healthy |
+| **V2 — Fix Faster** | 🚧 In Progress | Know what broke and recover in 60 seconds |
 | **V3 — Prevent Failures** | 🔜 Planned | Know what's risky before you push |
 | **V4 — Ship at Scale** | 🔜 Planned | Production-ready for teams |
 
@@ -91,6 +93,11 @@ Neo4j (Graph) + Redis (Cache)
 Next.js Dashboard
 ```
 
+## Architecture
+
+![CI-CD_Sentinel Architecture](docs/diagrams/architecture.png)
+
+
 **Core data model (nodes + relationships):**
 ```
 Service ←─[DEPLOYED_TO]── Deployment ──[BASED_ON]──→ Commit ──[CHANGED_FILE]──→ File
@@ -119,10 +126,10 @@ Service ←─[DEPLOYED_TO]── Deployment ──[BASED_ON]──→ Commit �
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/your-org/ci-cd-sentinel
-cd ci-cd-sentinel
+git clone https://github.com/ganeshak11/CI-CD_Sentinel
+cd CI-CD_Sentinel
 
-# 2. Configure environment
+# 2. Configure environment    
 cp backend/.env.example backend/.env
 # Edit backend/.env with your GitHub token, webhook secret, SMTP, Slack
 
@@ -137,13 +144,18 @@ open http://localhost:3000
 ### First-Run Setup
 
 1. Login at `http://localhost:3000` with your GitHub account
-2. Register your first service (name, repo URL, health endpoint URL)
-3. In your GitHub repo → Settings → Webhooks → Add webhook:
+2. Register your services:
+   - **Single service:** Use the UI at `/services/new` (name, repo URL, health endpoint, dependencies)
+   - **Bulk import:** Create a `sentinel-services.yml` and run `sentinel import --file sentinel-services.yml`
+   - **Auto-discovery (V2+):** Connect your GitHub Org and select repos from a checklist
+3. Add the GitHub webhook (choose one):
+   - **Per-repo:** GitHub repo → Settings → Webhooks → Add webhook
+   - **Organization-level (recommended for multi-repo):** GitHub Org → Settings → Webhooks → Add webhook once for all repos
    - Payload URL: `http://your-sentinel-host:3001/webhooks/github`
    - Content type: `application/json`
    - Secret: your `GITHUB_WEBHOOK_SECRET` value
    - Events: `Workflow runs`
-4. Sentinel begins tracking on the next pipeline run
+4. Sentinel begins tracking on the next pipeline run (health monitoring starts immediately after registration)
 
 ### Environment Variables
 
@@ -234,6 +246,7 @@ POST /webhooks/github                       Receive GitHub Actions events (idemp
 
 GET  /api/services                          List tracked services
 POST /api/services                          Register new service
+POST /api/services/import                   Bulk import from YAML config
 GET  /api/services/:id/env-drift            Secret key drift analysis
 
 GET  /api/deployments                       Deployment history (paginated)
@@ -320,7 +333,7 @@ Enterprise features are gated via `SENTINEL_LICENSE_KEY`. The core platform alwa
 |---|---|---|
 | Repo Owner / DevOps | Ganesh | Docker Compose, Neo4j schema, CI/CD setup |
 | Backend | Chinmay | Webhook ingestion, Deployment node creation |
-| Member 3 | — | Health worker, HealthCheck nodes, Redis |
+| Abdul | Health worker, HealthCheck nodes, Redis |
 | Frontend | Varsha | Next.js scaffold, dashboard shell |
 
 ---
