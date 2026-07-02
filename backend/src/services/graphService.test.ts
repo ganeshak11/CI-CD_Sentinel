@@ -2,14 +2,9 @@ import { v4 as uuidv4 } from 'uuid';
 import {
   createService,
   findServicesByRepo,
-  createDeployment,
-  createCommit,
-  getServiceById,
-  getAllServices,
   bulkCreateServices,
   createHealthCheck,
   getHealthHistory,
-  deleteService,
 } from './graphService';
 import { driver, executeQuery } from '../db/index';
 

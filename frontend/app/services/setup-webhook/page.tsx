@@ -37,7 +37,7 @@ export default function SetupWebhook() {
       </div>
 
       <p className="mt-6 text-sm text-gray-500">
-        Make sure to select <strong>Workflow runs</strong> under "Let me select individual events".
+        Make sure to select <strong>Workflow runs</strong> under &quot;Let me select individual events&quot;.
       </p>
     </div>
   );
