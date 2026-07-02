@@ -31,7 +31,7 @@ This checklist tracks the entire lifecycle of the CI-CD_Sentinel project from a 
 ## 3. Production Readiness & CI (Continuous Integration)
 *Ensuring the code is ready to be built into production artifacts.*
 
-- [ ] **Dockerfiles:** Write optimized, multi-stage Dockerfiles for the Backend (Node) and Frontend (Next.js).
+- [x] **Dockerfiles:** Write optimized, multi-stage Dockerfiles for the Backend (Node) and Frontend (Next.js).
 - [x] **CI Pipeline (Build & Test):** Create a GitHub Action (`.github/workflows/ci.yml`) that runs on every PR to `dev` and `main` to build the Docker images and run tests (ensures the build isn't broken).
 - [x] **Environment Configuration:** Ensure the production `docker-compose.yml` pulls images from the registry rather than building from local source.
 ---

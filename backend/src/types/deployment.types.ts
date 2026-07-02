@@ -116,6 +116,39 @@ export interface HealthCheck {
   checkedAt: string; // ISO timestamp
 }
 
+// ─── RCA & Analytics (V2) ─────────────────────────────────────────────────────
+
+export interface ErrorPattern {
+  id: string;
+  type:
+    | 'build_failure'
+    | 'test_failure'
+    | 'oom_kill'
+    | 'timeout'
+    | 'missing_secret'
+    | 'network_error'
+    | 'dependency_conflict'
+    | 'lint_error';
+  message: string;
+  severity: 'critical' | 'warning' | 'info';
+  confidence: number;
+  detectedAt: string;
+}
+
+export interface File {
+  path: string;
+  changeType: 'added' | 'modified' | 'deleted';
+}
+
+export interface Rollback {
+  id: string;
+  triggeredAt: string;
+  trigger: 'automatic' | 'manual';
+  strategy: 'rerun' | 'workflow_dispatch';
+  targetDeploymentId: string;
+  status: 'pending' | 'triggered' | 'failed';
+}
+
 // ─── Query results ───────────────────────────────────────────────────────────
 
 export interface ServiceWithHealth extends Service {
@@ -125,4 +158,11 @@ export interface ServiceWithHealth extends Service {
 
 export interface DeploymentWithCommit extends Deployment {
   commit: Commit | null;
+}
+
+export interface DeploymentWithRCA {
+  deployment: Deployment;
+  errorPatterns: ErrorPattern[];
+  commit: Commit | null;
+  changedFiles: File[];
 }

@@ -27,6 +27,10 @@ import {
   DeploymentWithCommit,
   BulkServiceConfig,
   BulkImportResult,
+  ErrorPattern,
+  File,
+  Rollback,
+  DeploymentWithRCA
 } from '../types/deployment.types';
 
 // ─── Service Queries ──────────────────────────────────────────────────────────
@@ -517,4 +521,184 @@ export async function getHealthHistory(
 
   const result = await executeQuery(query, { serviceId, limit });
   return result.records.map((row) => row.get('h').properties as HealthCheck);
+}
+
+// ─── V2: Graph Intelligence Queries (RCA & Rollback) ──────────────────────────
+
+/**
+ * Create an :ErrorPattern node and link it to the :Deployment.
+ * Relationship: (:Deployment)-[:CAUSED_ERROR]->(:ErrorPattern)
+ */
+export async function createErrorPattern(
+  deploymentId: string,
+  pattern: Omit<ErrorPattern, 'id' | 'detectedAt'>
+): Promise<ErrorPattern> {
+  const id = uuidv4();
+  const detectedAt = new Date().toISOString();
+
+  const query = `
+    MATCH (d:Deployment { id: $deploymentId })
+    CREATE (e:ErrorPattern {
+      id: $id,
+      type: $type,
+      message: $message,
+      severity: $severity,
+      confidence: $confidence,
+      detectedAt: $detectedAt
+    })
+    MERGE (d)-[:CAUSED_ERROR]->(e)
+    RETURN e
+  `;
+
+  const result = await executeQuery(query, {
+    deploymentId,
+    id,
+    type: pattern.type,
+    message: pattern.message,
+    severity: pattern.severity,
+    confidence: pattern.confidence,
+    detectedAt,
+  });
+
+  return result.records[0].get('e').properties as ErrorPattern;
+}
+
+/**
+ * Create a :File node and link it to the :Commit.
+ * Relationship: (:Commit)-[:CHANGED_FILE]->(:File)
+ */
+export async function createFileChange(
+  commitSha: string,
+  filePath: string,
+  changeType: 'added' | 'modified' | 'deleted'
+): Promise<File> {
+  const query = `
+    MATCH (c:Commit { sha: $commitSha })
+    MERGE (f:File { path: $filePath })
+    ON CREATE SET f.changeType = $changeType
+    ON MATCH SET f.changeType = $changeType
+    MERGE (c)-[:CHANGED_FILE]->(f)
+    RETURN f
+  `;
+
+  const result = await executeQuery(query, {
+    commitSha,
+    filePath,
+    changeType,
+  });
+
+  return result.records[0].get('f').properties as File;
+}
+
+/**
+ * Find the most recent deployment for a service where conclusion = 'success'.
+ */
+export async function getLastHealthyDeployment(
+  serviceId: string
+): Promise<Deployment | null> {
+  const query = `
+    MATCH (d:Deployment { serviceId: $serviceId, conclusion: 'success' })
+    RETURN d
+    ORDER BY d.startedAt DESC
+    LIMIT 1
+  `;
+
+  const result = await executeQuery(query, { serviceId });
+  if (result.records.length === 0) return null;
+  return result.records[0].get('d').properties as Deployment;
+}
+
+/**
+ * Create a :Rollback node and link it to the target :Deployment.
+ * Relationship: (:Deployment)-[:TRIGGERED_ROLLBACK]->(:Rollback)
+ */
+export async function createRollback(
+  rollbackData: Omit<Rollback, 'id' | 'triggeredAt' | 'status'>
+): Promise<Rollback> {
+  const id = uuidv4();
+  const triggeredAt = new Date().toISOString();
+  const status = 'triggered';
+
+  const query = `
+    MATCH (d:Deployment { id: $targetDeploymentId })
+    CREATE (r:Rollback {
+      id: $id,
+      triggeredAt: $triggeredAt,
+      trigger: $trigger,
+      strategy: $strategy,
+      targetDeploymentId: $targetDeploymentId,
+      status: $status
+    })
+    MERGE (d)-[:TRIGGERED_ROLLBACK]->(r)
+    RETURN r
+  `;
+
+  const result = await executeQuery(query, {
+    targetDeploymentId: rollbackData.targetDeploymentId,
+    id,
+    triggeredAt,
+    trigger: rollbackData.trigger,
+    strategy: rollbackData.strategy,
+    status,
+  });
+
+  return result.records[0].get('r').properties as Rollback;
+}
+
+/**
+ * Fetch a deployment with its RCA data (ErrorPatterns, Commit, File changes)
+ */
+export async function getDeploymentWithRCA(
+  deploymentId: string
+): Promise<DeploymentWithRCA | null> {
+  const query = `
+    MATCH (d:Deployment { id: $deploymentId })
+    OPTIONAL MATCH (d)-[:CAUSED_ERROR]->(e:ErrorPattern)
+    OPTIONAL MATCH (d)-[:BASED_ON]->(c:Commit)
+    OPTIONAL MATCH (c)-[:CHANGED_FILE]->(f:File)
+    RETURN d,
+           collect(DISTINCT e) AS errorPatterns,
+           c AS commit,
+           collect(DISTINCT f) AS changedFiles
+  `;
+
+  const result = await executeQuery(query, { deploymentId });
+  if (result.records.length === 0) return null;
+
+  const row = result.records[0];
+  const d = row.get('d').properties as Deployment;
+  const commit = row.get('commit')?.properties as Commit ?? null;
+  
+  const errorPatterns = row.get('errorPatterns')
+    .map((node: any) => node.properties)
+    .filter((props: any) => Object.keys(props).length > 0) as ErrorPattern[];
+    
+  const changedFiles = row.get('changedFiles')
+    .map((node: any) => node.properties)
+    .filter((props: any) => Object.keys(props).length > 0) as File[];
+
+  return {
+    deployment: d,
+    errorPatterns,
+    commit,
+    changedFiles
+  };
+}
+
+/**
+ * Fetch ordered deployment history for visualization.
+ */
+export async function getDeploymentChain(
+  serviceId: string,
+  limit: number = 10
+): Promise<Deployment[]> {
+  const query = `
+    MATCH (d:Deployment { serviceId: $serviceId })
+    RETURN d
+    ORDER BY d.startedAt DESC
+    LIMIT toInteger($limit)
+  `;
+
+  const result = await executeQuery(query, { serviceId, limit });
+  return result.records.map(row => row.get('d').properties as Deployment);
 }

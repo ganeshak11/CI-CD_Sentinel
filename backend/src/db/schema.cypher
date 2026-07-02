@@ -17,6 +17,12 @@ CREATE CONSTRAINT deployment_id IF NOT EXISTS FOR (d:Deployment) REQUIRE d.id IS
 // guarantees idempotency when the same commit appears in multiple webhooks.
 CREATE CONSTRAINT commit_sha IF NOT EXISTS FOR (c:Commit) REQUIRE c.sha IS UNIQUE;
 
+// ErrorPattern.id — internal UUID.
+CREATE CONSTRAINT errorpattern_id IF NOT EXISTS FOR (e:ErrorPattern) REQUIRE e.id IS UNIQUE;
+
+// File.path — exact path of the changed file.
+CREATE CONSTRAINT file_path IF NOT EXISTS FOR (f:File) REQUIRE f.path IS UNIQUE;
+
 // ─── 2. Indexes ─────────────────────────────────────────────────────────────
 // Speed up the most common query patterns used by the dashboard and workers.
 
@@ -34,3 +40,12 @@ CREATE INDEX healthcheck_checked_at IF NOT EXISTS FOR (h:HealthCheck) ON (h.chec
 
 // Filter services by environment on the dashboard overview.
 CREATE INDEX service_env IF NOT EXISTS FOR (s:Service) ON (s.environment);
+
+// Filter error patterns by type (e.g. all out-of-memory errors).
+CREATE INDEX errorpattern_type IF NOT EXISTS FOR (e:ErrorPattern) ON (e.type);
+
+// Filter error patterns by severity.
+CREATE INDEX errorpattern_severity IF NOT EXISTS FOR (e:ErrorPattern) ON (e.severity);
+
+// Sort rollbacks by when they were triggered.
+CREATE INDEX rollback_triggered_at IF NOT EXISTS FOR (r:Rollback) ON (r.triggeredAt);
