@@ -41,7 +41,14 @@ export async function getHealthStatus() {
   return json.data || [];
 }
 
-export async function createService(data: Omit<Service, "id">) {
+export async function createService(data: {
+  name: string;
+  repoUrl: string;
+  pathFilter?: string;
+  healthEndpoint: string;
+  environment: string;
+  rollbackStrategy?: string;
+}) {
   const response = await fetch(
     `${API_URL}/api/services`,
     {
