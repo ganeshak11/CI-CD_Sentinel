@@ -115,7 +115,7 @@ Database
 stores deployment metadata, logs, rules, history.
 
 Technology:
-PostgreSQL
+Neo4j
 
 Dashboard UI
 
