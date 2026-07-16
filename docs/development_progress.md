@@ -25,7 +25,7 @@ Status Keys: ⚪ Not Started | 🟡 In Progress | 🟢 Completed
 | Feature | Assignee | Status | Notes |
 |---|---|---|---|
 | Automated Rollback Engine (Re-run API) | Abdul | ⚪ Not Started | Tier 1 auto + Tier 2 manual rollback via GitHub API |
-| Rollback Graph Relationships | Ganesh | ⚪ Not Started | `Rollback` node, `TRIGGERED_ROLLBACK` rel, `getLastHealthyDeployment()` |
+| Rollback Graph Relationships | Ganesh | 🟢 Completed | `Rollback` node, `TRIGGERED_ROLLBACK` rel, `getLastHealthyDeployment()` |
 | LogFetchJob Pipeline (Zip Fetch & Parse) | Chinmay | ⚪ Not Started | GitHub Actions log ZIP → extract → last 500 lines in Redis |
 | RCA Engine (Regex Rules & Status) | Chinmay | ⚪ Not Started | 8 error pattern types, confidence scoring, `ErrorPattern` nodes |
 | RCA Panel UI | Varsha | ⚪ Not Started | Deployment detail page — error patterns, log viewer, changed files |
