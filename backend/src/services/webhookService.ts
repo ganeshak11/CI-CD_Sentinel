@@ -1,5 +1,7 @@
 import * as graphService from './graphService';
 import { getChangedFiles } from './github.service';
+import { fetchLogs } from './logFetchJob';
+import { analyzeLog } from './rcaService';
 import {
   CreateDeploymentInput,
   CreateCommitInput,
@@ -140,6 +142,65 @@ export async function handleWorkflowRun(payload: any): Promise<{ message: string
 
   console.log(`[webhookService] Linking commit ${commitSha} to deployment(s) for run ${workflowRunId}...`);
   await graphService.createCommit(commitInput, workflowRunId);
+
+  // ─── V2: RCA Pipeline (non-blocking on failure) ─────────────────────────────
+  if (conclusionRaw === 'failure') {
+    // Fire-and-forget: errors are caught and logged, never propagated
+    (async () => {
+      try {
+        console.log(`[webhookService] Failure detected — starting RCA pipeline for run ${workflowRunId}`);
+
+        // Step 1: Fetch logs from GitHub Actions
+        let logText = '';
+        try {
+          logText = await fetchLogs(repoFullName, workflowRunId);
+          console.log(`[webhookService] Logs fetched successfully for run ${workflowRunId}`);
+        } catch (logErr: any) {
+          console.error(`[webhookService] Log fetch failed (non-fatal): ${logErr.message}`);
+          // Continue — RCA can still detect patterns if we have partial logs
+        }
+
+        // Step 2: Run RCA analysis on log text
+        if (logText) {
+          const patterns = analyzeLog(logText);
+          console.log(`[webhookService] RCA found ${patterns.length} error pattern(s) for run ${workflowRunId}`);
+
+          // Step 3: Create ErrorPattern nodes for each matched service deployment
+          for (const service of matchedServices) {
+            // Find the deployment ID for this service's deployment
+            const deployments = await graphService.getDeployments(service.id, 1, 0);
+            const deployment = deployments[0];
+            if (!deployment) continue;
+
+            for (const pattern of patterns) {
+              try {
+                await graphService.createErrorPattern(deployment.id, pattern);
+              } catch (patternErr: any) {
+                console.error(`[webhookService] Failed to create error pattern: ${patternErr.message}`);
+              }
+            }
+          }
+        }
+
+        // Step 4: Record changed files from the commit
+        try {
+          const changedFiles = await getChangedFiles(repoFullName, commitSha);
+          for (const filePath of changedFiles) {
+            try {
+              await graphService.createFileChange(commitSha, filePath, 'modified');
+            } catch (fileErr: any) {
+              console.error(`[webhookService] Failed to create file change node: ${fileErr.message}`);
+            }
+          }
+          console.log(`[webhookService] Recorded ${changedFiles.length} file change(s) for commit ${commitSha}`);
+        } catch (filesErr: any) {
+          console.error(`[webhookService] Failed to fetch changed files (non-fatal): ${filesErr.message}`);
+        }
+      } catch (rcaErr: any) {
+        console.error(`[webhookService] RCA pipeline error (non-fatal): ${rcaErr.message}`);
+      }
+    })();
+  }
 
   const matchedNames = matchedServices.map((s) => s.name).join(', ');
   return { message: `Successfully registered deployment for services: [${matchedNames}]` };
