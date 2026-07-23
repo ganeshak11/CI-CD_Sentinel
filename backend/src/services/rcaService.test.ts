@@ -10,7 +10,7 @@
  */
 
 import { analyzeLog } from './rcaService';
-import { matchLine, ALL_PATTERNS, BUILD_FAILURE, TEST_FAILURE, OOM_KILL, TIMEOUT, MISSING_SECRET, NETWORK_ERROR, DEPENDENCY_CONFLICT, LINT_ERROR } from '../utils/errorPatterns';
+import { matchLine, BUILD_FAILURE } from '../utils/errorPatterns';
 
 // ─── Helper ───────────────────────────────────────────────────────────────────
 
