@@ -1,5 +1,6 @@
 import * as graphService from './graphService';
 import { getChangedFiles } from './github.service';
+import * as notificationService from './notificationService';
 import {
   CreateDeploymentInput,
   CreateCommitInput,
@@ -125,7 +126,25 @@ export async function handleWorkflowRun(payload: any): Promise<{ message: string
     };
 
     console.log(`[webhookService] Merging deployment for service ${service.name}...`);
-    await graphService.createDeployment(deploymentInput);
+    const deployment = await graphService.createDeployment(deploymentInput);
+
+    // Send failure notifications asynchronously (non-blocking)
+    if (deployment.conclusion === 'failure') {
+      console.log(`[webhookService] Deployment failed for ${service.name}. Sending notifications...`);
+      
+      // Send Slack alert (fire and forget)
+      notificationService.sendDeploymentAlert(deployment, service).catch((err) => {
+        console.error(`[webhookService] Failed to send Slack alert for deployment ${deployment.id}:`, err);
+      });
+
+      // Send email alert if ALERT_EMAIL is configured (fire and forget)
+      const alertEmail = process.env.ALERT_EMAIL;
+      if (alertEmail) {
+        notificationService.sendDeploymentFailureEmail(deployment, service, alertEmail).catch((err) => {
+          console.error(`[webhookService] Failed to send email alert for deployment ${deployment.id}:`, err);
+        });
+      }
+    }
   }
 
   // Create commit node and link it to all created deployments (linked via workflowRunId)

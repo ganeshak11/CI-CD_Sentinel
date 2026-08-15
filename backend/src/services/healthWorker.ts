@@ -1,7 +1,8 @@
 import axios from 'axios';
 import cron from 'node-cron';
 
-import { getAllServices, createHealthCheck } from './graphService';
+import { getAllServices, createHealthCheck, getHealthHistory } from './graphService';
+import * as rollbackService from './rollbackService';
 import { setHealthCache } from './redisClient';
 import { ServiceWithHealth, HealthStatus } from '../types/deployment.types';
 
@@ -49,6 +50,26 @@ async function probeServiceHealth(service: ServiceWithHealth) {
     );
   } catch (err) {
     console.error('[healthWorker] Failed to create HealthCheck for', service.id, err);
+  }
+
+  // Check for auto-rollback trigger: if last 3 checks are unhealthy
+  if (status === 'unhealthy') {
+    try {
+      const lastThreeChecks = await getHealthHistory(service.id, 3);
+      if (lastThreeChecks.length === 3 && lastThreeChecks.every((h) => h.status === 'unhealthy')) {
+        console.log(
+          `[healthWorker] Service ${service.id} has 3 consecutive unhealthy checks. Triggering auto-rollback...`
+        );
+        const rollbackTriggered = await rollbackService.triggerAutoRollback(service.id);
+        if (rollbackTriggered) {
+          console.log(`[healthWorker] Auto-rollback triggered successfully for ${service.id}`);
+        } else {
+          console.warn(`[healthWorker] Auto-rollback failed or skipped for ${service.id}`);
+        }
+      }
+    } catch (err) {
+      console.error('[healthWorker] Failed to check health history or trigger rollback:', err);
+    }
   }
 
   try {

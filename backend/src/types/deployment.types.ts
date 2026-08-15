@@ -116,6 +116,31 @@ export interface HealthCheck {
   checkedAt: string; // ISO timestamp
 }
 
+// ─── Rollback ────────────────────────────────────────────────────────────────
+
+export type RollbackTrigger = 'automatic' | 'manual';
+export type RollbackStatus = 'pending' | 'triggered' | 'failed';
+
+export interface Rollback {
+  id: string;
+  deploymentId: string;           // Deployment that was rolled back
+  triggeredAt: string;            // ISO timestamp
+  trigger: RollbackTrigger;       // 'automatic' or 'manual'
+  strategy: RollbackStrategy;     // 'rerun' or 'workflow_dispatch'
+  targetDeploymentId: string;     // Deployment being rolled back to
+  status: RollbackStatus;         // 'pending', 'triggered', or 'failed'
+}
+
+export interface CreateRollbackInput {
+  id: string;
+  deploymentId: string;
+  triggeredAt: string;
+  trigger: RollbackTrigger;
+  strategy: RollbackStrategy;
+  targetDeploymentId: string;
+  status: RollbackStatus;
+}
+
 // ─── Query results ───────────────────────────────────────────────────────────
 
 export interface ServiceWithHealth extends Service {

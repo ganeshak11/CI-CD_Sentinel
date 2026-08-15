@@ -518,3 +518,81 @@ export async function getHealthHistory(
   const result = await executeQuery(query, { serviceId, limit });
   return result.records.map((row) => row.get('h').properties as HealthCheck);
 }
+
+// ─── Rollback Queries ───────────────────────────────────────────────────────
+
+/**
+ * Get the most recent successful deployment for a service.
+ * Used by rollbackService to find the target deployment for rollback.
+ *
+ * @param serviceId The service ID
+ * @returns The most recent Deployment with conclusion = 'success', or null
+ */
+export async function getLastHealthyDeployment(serviceId: string): Promise<Deployment | null> {
+  const query = `
+    MATCH (s:Service { id: $serviceId })-[:DEPLOYED]->(d:Deployment)
+    WHERE d.conclusion = 'success'
+    RETURN d
+    ORDER BY d.completedAt DESC
+    LIMIT 1
+  `;
+
+  const result = await executeQuery(query, { serviceId });
+  if (result.records.length === 0) {
+    return null;
+  }
+
+  return result.records[0].get('d').properties as Deployment;
+}
+
+/**
+ * Create a Rollback node and link it to a deployment.
+ * Called by rollbackService after triggering a rollback.
+ *
+ * @param rollbackData Object with rollback details
+ * @returns The created Rollback node properties
+ */
+export async function createRollback(rollbackData: any): Promise<any> {
+  const query = `
+    MATCH (d:Deployment { id: $deploymentId })
+    MERGE (r:Rollback { id: $id })
+    ON CREATE SET
+      r.deploymentId     = $deploymentId,
+      r.triggeredAt      = $triggeredAt,
+      r.trigger          = $trigger,
+      r.strategy         = $strategy,
+      r.targetDeploymentId = $targetDeploymentId,
+      r.status           = $status
+    MERGE (d)-[:TRIGGERED_ROLLBACK]->(r)
+    RETURN r
+  `;
+
+  const result = await executeQuery(query, {
+    id: rollbackData.id,
+    deploymentId: rollbackData.deploymentId,
+    triggeredAt: rollbackData.triggeredAt,
+    trigger: rollbackData.trigger,
+    strategy: rollbackData.strategy,
+    targetDeploymentId: rollbackData.targetDeploymentId,
+    status: rollbackData.status,
+  });
+
+  return result.records[0].get('r').properties;
+}
+
+/**
+ * Get all services that depend on the given service.
+ * Used by rollbackService to calculate dependent services for rollback preview.
+ *
+ * @param serviceId The service ID
+ * @returns Array of dependent Service objects
+ */
+export async function getDependentServices(serviceId: string): Promise<Service[]> {
+  const query = `
+    MATCH (s:Service { id: $serviceId })<-[:DEPENDS_ON]-(dep:Service)
+    RETURN dep
+  `;
+
+  const result = await executeQuery(query, { serviceId });
+  return result.records.map((row) => row.get('dep').properties as Service);
+}
