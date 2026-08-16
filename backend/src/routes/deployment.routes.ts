@@ -74,14 +74,14 @@ router.post('/:id/rollback', async (req, res) => {
 });
 
 // POST /api/deployments/:id/redeploy
-// Re-triggers the exact same deployment (same commit, same workflow)
+// Re-triggers the exact same workflow run (same commit, same workflow)
 router.post('/:id/redeploy', async (req, res) => {
   try {
-    // For now, this is a placeholder. Implementation would:
-    // 1. Get the deployment with workflow run ID
-    // 2. Call GitHub API to re-run that specific workflow run
-    // 3. Create a new Deployment node linked to the re-run
-    res.json({ message: 'Redeploy endpoint - implementation pending based on workflow preferences' });
+    const redeploy = await rollbackService.triggerRedeploy(req.params.id);
+    if (!redeploy) {
+      return res.status(400).json({ error: 'Failed to redeploy workflow' });
+    }
+    res.json({ data: redeploy, message: 'Redeploy triggered successfully' });
   } catch (err: any) {
     console.error('[deployment.routes] POST /deployments/:id/redeploy error:', err.message);
     res.status(500).json({ error: err.message || 'Failed to redeploy' });

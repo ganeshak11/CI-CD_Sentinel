@@ -17,8 +17,8 @@ import * as graphService from './graphService';
 import * as notificationService from './notificationService';
 import { v4 as uuidv4 } from 'uuid';
 
-const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
-const ALERT_EMAIL = process.env.ALERT_EMAIL;
+const getGitHubToken = () => process.env.GITHUB_TOKEN;
+const getAlertEmail = () => process.env.ALERT_EMAIL;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -92,9 +92,10 @@ export async function triggerAutoRollback(serviceId: string): Promise<boolean> {
       console.error('[rollbackService] Failed to send Slack rollback alert:', err);
     }
 
-    if (ALERT_EMAIL) {
+    const alertEmail = getAlertEmail();
+    if (alertEmail) {
       try {
-        await notificationService.sendRollbackEmail(service, targetDeployment, ALERT_EMAIL);
+        await notificationService.sendRollbackEmail(service, targetDeployment, alertEmail);
       } catch (err) {
         console.error('[rollbackService] Failed to send email rollback alert:', err);
       }
@@ -168,9 +169,10 @@ export async function triggerManualRollback(deploymentId: string): Promise<Rollb
       console.error('[rollbackService] Failed to send Slack rollback alert:', err);
     }
 
-    if (ALERT_EMAIL) {
+    const alertEmail = getAlertEmail();
+    if (alertEmail) {
       try {
-        await notificationService.sendRollbackEmail(service, targetDeployment, ALERT_EMAIL);
+        await notificationService.sendRollbackEmail(service, targetDeployment, alertEmail);
       } catch (err) {
         console.error('[rollbackService] Failed to send email rollback alert:', err);
       }
@@ -268,12 +270,13 @@ async function callGitHubRollbackAPI(
   deployment: any,
   strategy: 'rerun' | 'workflow_dispatch'
 ): Promise<void> {
-  if (!GITHUB_TOKEN) {
+  const githubToken = getGitHubToken();
+  if (!githubToken) {
     throw new Error('GITHUB_TOKEN not configured');
   }
 
   const headers = {
-    Authorization: `Bearer ${GITHUB_TOKEN}`,
+    Authorization: `Bearer ${githubToken}`,
     'X-GitHub-Api-Version': '2022-11-28',
     'Accept': 'application/vnd.github+json',
   };
@@ -322,7 +325,9 @@ export async function getRollbackPreview(deploymentId: string): Promise<any> {
 
     // Calculate risk level based on deployment history
     const recentDeployments = await graphService.getDeployments(deployment.serviceId, 10, 0);
-    const failureRate = recentDeployments.filter((d: any) => d.conclusion === 'failure').length / recentDeployments.length;
+    const failureRate = recentDeployments.length
+      ? recentDeployments.filter((d: any) => d.conclusion === 'failure').length / recentDeployments.length
+      : 0;
 
     let riskLevel = 'low';
     if (failureRate > 0.5) {
@@ -340,5 +345,63 @@ export async function getRollbackPreview(deploymentId: string): Promise<any> {
   } catch (err: any) {
     console.error('[rollbackService] Error in getRollbackPreview:', err.message);
     throw err;
+  }
+}
+
+/**
+ * Re-trigger the exact same workflow run for a deployment.
+ * This is used by the redeploy endpoint to re-run the same GitHub Actions run.
+ */
+export async function triggerRedeploy(deploymentId: string): Promise<RollbackData | null> {
+  try {
+    const deployment = await graphService.getDeploymentById(deploymentId);
+    if (!deployment) {
+      console.warn(`[rollbackService] Deployment ${deploymentId} not found for redeploy.`);
+      return null;
+    }
+
+    const service = await graphService.getServiceById(deployment.serviceId);
+    if (!service) {
+      console.warn(`[rollbackService] Service ${deployment.serviceId} not found for redeploy.`);
+      return null;
+    }
+
+    const githubToken = getGitHubToken();
+    if (!githubToken) {
+      throw new Error('GITHUB_TOKEN not configured');
+    }
+
+    const headers = {
+      Authorization: `Bearer ${githubToken}`,
+      'X-GitHub-Api-Version': '2022-11-28',
+      Accept: 'application/vnd.github+json',
+    };
+
+    const url = `https://api.github.com/repos/${service.repoUrl}/actions/runs/${deployment.workflowRunId}/rerun`;
+    console.log(`[rollbackService] Redeploying workflow run ${deployment.workflowRunId} via ${url}`);
+
+    const response = await axios.post(url, {}, { headers, timeout: 10000 });
+
+    if (response.status < 200 || response.status >= 300) {
+      throw new Error(`GitHub API returned status ${response.status}`);
+    }
+
+    const redeployRecord: RollbackData = {
+      id: uuidv4(),
+      deploymentId,
+      triggeredAt: new Date().toISOString(),
+      trigger: 'manual',
+      strategy: service.rollbackStrategy || 'rerun',
+      targetDeploymentId: deployment.id,
+      status: 'triggered',
+    };
+
+    await graphService.createRollback(redeployRecord);
+    console.log(`[rollbackService] Redeploy recorded for deployment ${deploymentId}`);
+
+    return redeployRecord;
+  } catch (err: any) {
+    console.error('[rollbackService] Error in triggerRedeploy:', err.message);
+    return null;
   }
 }
